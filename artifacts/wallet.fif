@@ -1,0 +1,173 @@
+"Asm.fif" include
+// automatically generated from `contracts/wallet.fc` incl:`contracts/stdlib.fc` 
+PROGRAM{
+  DECLPROC dispatch_request
+  DECLPROC process_signed_request
+  DECLPROC recv_external
+  DECLPROC recv_internal
+  85143 DECLMETHOD seqno
+  81467 DECLMETHOD get_subwallet_id
+  78748 DECLMETHOD get_public_key
+  89080 DECLMETHOD has_extension
+  77265 DECLMETHOD get_extensions_list
+  dispatch_request PROC:<{
+    4 BLKDROP
+    WHILE:<{
+      DUP
+      SREFS
+    }>DO<{
+      2 LDU
+      SWAP
+      0 EQINT
+      IF:<{
+        8 LDU
+        LDREF
+        s0 s2 XCHG
+        SENDRAWMSG
+      }>
+    }>
+    DROP
+  }>
+  process_signed_request PROC:<{
+    s0 s4 XCHG
+    9 PUSHPOW2
+    LDSLICEX
+    DUP
+    32 LDU
+    32 LDU
+    32 LDU
+    s0 s2 XCHG
+    NOW
+    LEQ
+    36 THROWIF
+    s7 PUSH
+    EQUAL
+    33 THROWIFNOT
+    s1 s5 XCPU
+    EQUAL
+    34 THROWIFNOT
+    SWAP
+    HASHSU
+    s0 s2 s3 XC2PU
+    CHKSIGNU
+    35 THROWIFNOT
+    ACCEPT
+    s0 s3 XCHG
+    INC
+    DUP
+    NEWC
+    32 STU
+    s3 s(-1) PUXC
+    32 STU
+    s2 s(-1) PUXC
+    256 STU
+    s5 s(-1) PUXC
+    STDICT
+    ENDC
+    c4 POP
+    COMMIT
+    s0 s3 XCHG
+    s0 s4 XCHG
+    dispatch_request CALLDICT
+  }>
+  recv_external PROC:<{
+    c4 PUSH
+    CTOS
+    32 LDU
+    32 LDU
+    256 LDU
+    LDDICT
+    ENDS
+    process_signed_request CALLDICT
+  }>
+  recv_internal PROC:<{
+    s2 POP
+    CTOS
+    4 LDU
+    DROP
+    1 PUSHINT
+    AND
+    IFJMP:<{
+      DROP
+    }>
+    DUP
+    SBITS
+    32 LESSINT
+    IFJMP:<{
+      DROP
+    }>
+    32 LDU
+    OVER
+    1702392942 PUSHINT
+    NEQ
+    s2 PUSH
+    1936287598 PUSHINT
+    NEQ
+    AND
+    IFJMP:<{
+      2DROP
+    }>
+    c4 PUSH
+    CTOS
+    32 LDU
+    32 LDU
+    256 LDU
+    LDDICT
+    ENDS
+    s5 PUSH
+    1702392942 PUSHINT
+    EQUAL
+    IFJMP:<{
+      6 BLKDROP
+    }>
+    s0 s5 XCHG
+    1936287598 PUSHINT
+    EQUAL
+    IF:<{
+      4 ROLL
+      process_signed_request CALLDICT
+    }>ELSE<{
+      5 BLKDROP
+    }>
+  }>
+  seqno PROC:<{
+    c4 PUSH
+    CTOS
+    32 PLDU
+  }>
+  get_subwallet_id PROC:<{
+    c4 PUSH
+    CTOS
+    32 PUSHINT
+    SDSKIPFIRST
+    32 PLDU
+  }>
+  get_public_key PROC:<{
+    c4 PUSH
+    CTOS
+    64 PUSHINT
+    SDSKIPFIRST
+    256 PLDU
+  }>
+  has_extension PROC:<{
+    c4 PUSH
+    CTOS
+    320 PUSHINT
+    SDSKIPFIRST
+    LDDICT
+    DROP
+    SWAP
+    NEWC
+    256 STU
+    ENDC
+    CTOS
+    SWAP
+    8 PUSHPOW2
+    DICTGET
+    NULLSWAPIFNOT
+    NIP
+  }>
+  get_extensions_list PROC:<{
+    PUSHNULL
+  }>
+}END>c
