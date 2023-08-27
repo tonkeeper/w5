@@ -1,2 +1,2 @@
 all:
-	func -PA contracts/stdlib.fc contracts/wallet.fc > artifacts/wallet.fif
+	func -PA contracts/wallet.fc > artifacts/wallet.fif

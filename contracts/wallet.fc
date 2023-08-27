@@ -1,5 +1,7 @@
 ;; #pragma version =0.2.0;
 
+#include "stdlib.fc";
+
 ;; Extensible wallet contract v5
 
 (slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
@@ -126,14 +128,14 @@
       return (); ;; did not find extension
     ;; }
     ;; Check that the sender indeed has the declared code in its contract.
-    (_, int sender_addr_hash) = parse_std_addr(full_msg_slice~load_msg_addr());
-    cell state_init = begin_cell().store_uint(0, 2).store_dict(code).store_dict(data).store_uint(0, 1).end_cell();
-    if (sender_addr_hash != cell_hash(state_init)) {
-      return (); ;; sender is not our extension
-    }
+    ;; (_, int sender_addr_hash) = parse_std_addr(full_msg_slice~load_msg_addr());
+    ;; cell state_init = begin_cell().store_uint(0, 2).store_dict(code).store_dict(data).store_uint(0, 1).end_cell();
+    ;; if (sender_addr_hash != cell_hash(state_init)) {
+    ;;   return (); ;; sender is not our extension
+    ;; }
     
     ;; The remainder of the body (up to 2 refs) can now be dispatched
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+    ;; dispatch_request(body, stored_seqno, stored_subwallet, public_key, extensions);
   }
   if (auth_kind == 0x7369676E) { ;; "sign"
     ;; Process the rest of the slice just like the signed request.
