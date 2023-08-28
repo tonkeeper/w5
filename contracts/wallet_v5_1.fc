@@ -1,11 +1,13 @@
-#pragma version =0.2.0;
+#pragma version =0.4.4;
+
+#include "imports/stdlib.fc";
 
 ;; Extensible wallet contract v5
 
 (slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
 (cell, int) dict_add_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTADDB";
 (cell, int) dict_delete?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTDEL";
-() set_actions(cell action_list) impure asm "c5 POP";
+
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
 () process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
@@ -42,28 +44,30 @@
 ;; - process more requests recursively
 () dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
 
-  ;; Recurse into extended actions until we reach standard actions
-  while (cs~load_uint(1)) {
-      int op = cs~load_uint(4);
+  ;; Read all the requests until we run out of bits.
+  while (cs.slice_refs()) {
+      int op = cs~load_uint(2);
       
-      ;; Raw set_data 
-      if (op == 0x1ff8ea0b) {
-          set_data(cs~load_ref());
+      ;; Emit raw message with a given sendmode.
+      if (op == 0) {
+          var mode = cs~load_uint(8);
+          send_raw_message(cs~load_ref(), mode);
       }
       
       ;; Add/remove extensions
-      if (op == 0x1c40db9f || op == 0x5eaef4a4) {
-          int code_hash = cs~load_uint(256);
+      if (op == 1 || op == 2) {
+          cell ext_code = cs~load_ref();
+          int key = cell_hash(ext_code);
           ;; Add extension
-          if (op == 0x1c40db9f) {
-              (extensions, int success?) = extensions.dict_add_builder?(256, code_hash, begin_cell());
+          if (op == 1) {
+              (extensions, int success?) = extensions.dict_add_builder?(256, key, begin_cell());
               throw_unless(39, success?);
           }
           ;; Remove extension
-          if (op == 0x5eaef4a4) {
-              (extensions, int success?) = extensions.dict_delete?(256, code_hash);
+          if (op == 2) {
+              (extensions, int success?) = extensions.dict_delete?(256, key);
               throw_unless(39, success?);
-          }
+          }    
      
           set_data(begin_cell()
             .store_uint(stored_seqno, 32)
@@ -72,15 +76,13 @@
             .store_dict(extensions)
             .end_cell());
       }
-
-      ;; Other actions are no-op
-      ;; FIXME: is it costlier to check for unsupported actions and throw?
-
-      cs = cs~load_ref().begin_parse()
+      
+      ;; Tail-call into a ref to process more requests. 
+      ;; This terminates iteration of the refs in this cell.
+      if (op == 3) {
+          cs = cs~load_ref().begin_parse()
+      }
   }
-  ;; At this point we are `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
-  ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs~load_ref());
   return ();
 }
 
@@ -88,13 +90,7 @@
   var ds = get_data().begin_parse();
   var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
   ds.end_parse();
-  int auth_kind = body~load_uint(32);
-  if (auth_kind == 0x7369676E) { ;; "sign"
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  } else {
-    ;; FIXME: probably need to throw here?
-    return ();
-  }
+  process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
 }
 
 
@@ -127,11 +123,6 @@
     ;; Note that some random contract may have deposited funds with this prefix, 
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     
-    ;; FIXME:
-    ;; In this revision we send full code+data refs instead of their hashes.
-    ;; In the future this should be optimized either with pruned cells or
-    ;; with an explicit pair of 256-bit strings in the body.
-    ;; Also consider subden's hack: transfer code+data in the stateinit for this wallet.
     (cell code, cell data) = (body~load_ref(), body~load_ref());
     var (_, success?) = extensions.dict_get?(256, cell_hash(code));
     if ~(success?) {

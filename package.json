@@ -1,0 +1,26 @@
+{
+    "name": "WalletV5",
+    "version": "0.0.1",
+    "scripts": {
+        "start": "blueprint run",
+        "build": "blueprint build",
+        "build:w5_1": "blueprint build Wallet_V5_1",
+        "build:w5_2": "blueprint build Wallet_V5_2",
+        "test": "jest"
+    },
+    "devDependencies": {
+        "@ton-community/blueprint": "^0.12.0",
+        "@ton-community/sandbox": "^0.11.0",
+        "@ton-community/test-utils": "^0.3.0",
+        "@types/jest": "^29.5.0",
+        "@types/node": "^20.2.5",
+        "jest": "^29.5.0",
+        "prettier": "^2.8.6",
+        "ton": "~13.6.0",
+        "ton-core": "^0.51.0",
+        "ton-crypto": "^3.2.0",
+        "ts-jest": "^29.0.5",
+        "ts-node": "^10.9.1",
+        "typescript": "^4.9.5"
+    }
+}
