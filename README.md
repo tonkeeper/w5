@@ -253,6 +253,7 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
       }
 
       ;; Other actions are no-op
+      ;; FIXME: is it costlier to check for unsupported actions and throw?
 
       cs = cs~load_ref().begin_parse()
   }
@@ -270,7 +271,8 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
   if (auth_kind == 0x7369676E) { ;; "sign"
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
   } else {
-    throw(40);
+    ;; FIXME: probably need to throw here?
+    return ();
   }
 }
 
