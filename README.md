@@ -4,72 +4,117 @@ Author: Oleg Andreev <oleg@tonkeeper.com>
 
 This is an extensible wallet specification aimed at replacing V4 and allowing arbitrary extensions.
 
-Features:
+* [Features](#features)
+* [Overview](#overview)
+* [Discussion](#discussion)
+* [Wallet ID](#wallet-id)
+* [TL-B definitions](#tl-b-definitions)
+* [Source code](#source-code)
 
-* Arbitrary amount of outgoing messages is supported via snake encoding.
+
+## Credits
+
+Thanks to [Andrew Gutarev](https://github.com/pyAndr3w) for the idea to set c5 register to a [list of pre-composed actions](https://github.com/pyAndr3w/ton-preprocessed-wallet-v2).
+
+Thanks to [@subden](https://t.me/subden) and [@botpult](https://t.me/botpult) for ideas and discussion.
+
+
+## Features
+
+* Arbitrary amount of outgoing messages is supported via action list.
+* Wallet code can be upgraded transparently without breaking user's address in the future.
 * Unlimited number of plugins can be deployed sharing the same code.
 * Wallet code can be extended by anyone in a decentralized and conflict-free way: multiple feature extensions can co-exist.
-* Plugins can perform the same operations as the signer: emit arbitrary messages on behalf of the owner, add and remove extensions.
+* Extensions can perform the same operations as the signer: emit arbitrary messages on behalf of the owner, add and remove extensions.
 * Signed requests can be delivered via internal message to allow 3rd party pay for gas.
+* Extensible ABI for future additions.
 
 ## Overview
 
-Wallet supports **2 authentication modes** and **4 operation types**:
+Wallet V5 supports **2 authentication modes**, all standard output actions (send message, set library, code replacement) plus additional **3 operation types**.
 
-Authentication: 
-* signature 
-* installed plugin
+Authentication:
+* by signature
+* by extension
 
 Operation types:
-* outgoing message
+* standard output actions
+* “set data”
 * install extension
 * remove extension
-* tail-call: more of the above
 
 Signed messages can be delivered both by external and internal messages.
 
 All operation types are available to all authentication modes.
 
-Tail-call operation permits chaining arbitrary number of operations, thus more than 4 messages can be added in a single transaction.
+## Discussion
 
+### What is the job of the wallet?
 
-## FAQ
+The job of the wallet is to send messages to other apps in the TON network on behalf of a single user identified by a single public key.
+User may delegate this job to other apps via extensions.
 
-#### Q: Can user not pay the gas fees?
+### The wallet is not for:
 
-A: Yes! You can deliver signed messages via an internal message from a 3rd party wallet. Also, the message is handled exactly like an external one: after the basic checks the wallet takes care of the fees itself, so that 3rd party does not need to overpay for users who actually do have TONs.
+* multi-user operation: you should use a multisig or DAO solution instead.
+* routing of incoming payments and messages: use a specialized contract instead.
+* imposing limits on access to certain assets: put account restriction inside a jetton, or use a lockup contract instead.
 
-#### Q: Does the wallet grow with number of plugins?
+### Extending the wallet
 
-A: Not really. Wallet only accumulates code extensions. So if even you have 100500 plugins based on just three types of contracts, your wallet would only store extra ≈96 bytes of data.
+**A. Code optimization**
 
-#### Q: Can plugins implement subscriptions that collect tokens?
+Backwards compatible code optimization **can be performed** with a single `set_code` action (`action_set_code#ad4de08e`) signed by the user. That is, hypothetical upgrade from v5R1 to v5R2 can be done in-place without forcing users to change wallet address.
 
-A: Yes. Plugins can emit arbitrary messages, including token transfers, on behalf of the wallet.
+If the optimized code requires changes to the data layout (e.g. reordering fields) the user can sign a request with two actions: `set_code` (in the standard action) and `set_data` (an extended action per this specification). Note that `set_data` action must make sure `seqno` is properly incremented after the upgrade as to prevent replays. Also, `set_data` must be performed right before the standard actions to not get overwritten by extension actions.
 
-#### Q: How can a plugin collect funds?
+User agents **should not** make `set_code` and `set_data` actions available via general-purpose API to prevent misuse and mistakes. Instead, they should be used as a part of migration logic for a specific wallet code.
 
-A: Plugin needs to send a request with a message to its own address.
+**B. Substantial upgrades**
 
-#### Q: How can a plugin self-destruct?
+We **do not recommend** performing substantial wallet upgrades in-place using `set_code`/`set_data` actions. Instead, user agents should have support for multiple accounts and easy switching between them.
 
-A: Plugin does not need to remove its extension code from the wallet — they can simply self-destroy by sending all TONs to the wallet with sendmode 128.
+In-place migration requires maintaining backwards compatibility for all wallet features, which in turn could lead to increase in code size and higher gas and rent costs.
 
-#### Q: How can I deploy a plugin, install its code and send it a message in one go?
+**C. Delegation/Capabilities schemes**
 
-A: You need two requests in your message body: first one installs the extension code, the second one sends raw message to your plugin address.
+We recommend trying out new wallet capabilities via the extensions scheme instead of upgrading the wallet code.
 
-#### Q: Wallet only stores the extension code, how does it know which plugins it actually installed?
+Wallet V5 supports scalable extensions that permit delegating access to the wallet to other contracts.
 
-A: You need to design extensions in such way that each plugin checks that it was deployed by its proper wallet. See how NFT items or jetton wallets do that. Your wallet can only trust the extension code that was audited to perform such authenticated initialization.
+From the perspective of the wallet, every extension can perform the same actions as the user. Therefore limits and capabilities can be embedded in such an extension with a custom storage scheme.
 
+Extensions can co-exist simultaneously, so experimental capabilities can be deployed and tested independently from each other.
 
+### Can the wallet outsource payment for gas fees?
 
-## TODO
+Yes! You can deliver signed messages via an internal message from a 3rd party wallet. Also, the message is handled exactly like an external one: after the basic checks the wallet takes care of the fees itself, so that 3rd party does not need to overpay for users who actually do have TONs.
 
-* Testing and review
-* Optimize transmission of code/data pair for plugin authentication. We only really need 2 hashes to reconstruct sender's address.
-* Other code optimizations
+### Does the wallet grow with number of plugins?
+
+Not really. Wallet only accumulates code extensions. So if even you have 100500 plugins based on just three types of contracts, your wallet would only store extra ≈96 bytes of data.
+
+### Can plugins implement subscriptions that collect tokens?
+
+Yes. Plugins can emit arbitrary messages, including token transfers, on behalf of the wallet.
+
+### How can a plugin collect funds?
+
+Plugin needs to send a request with a message to its own address.
+
+### How can a plugin self-destruct?
+
+Plugin does not need to remove its extension code from the wallet — they can simply self-destroy by sending all TONs to the wallet with sendmode 128.
+
+### How can I deploy a plugin, install its code and send it a message in one go?
+
+You need two requests in your message body: first one installs the extension code, the second one sends raw message to your plugin address.
+
+### How does the wallet know which plugins it has installed?
+
+Extension contracts are designed in such way that each one checks that it was deployed by its proper wallet. For an example of this initialization pattern see how NFT items or jetton wallets do that. 
+
+Your wallet can only trust the extension code that was audited to perform such authenticated initialization. Users are not supposed to install arbitrary extensions unknown to the user agent.
 
 
 ## Wallet ID
@@ -79,75 +124,59 @@ Wallet ID disambiguates requests signed with the same public key to different wa
 For Wallet V5 we suggest using the following wallet ID:
 
 ```
-20230820 + workchain
+mainnet: 20230823 + workchain
+testnet: 30230823 + workchain
 ```
 
 ## TL-B definitions
 
-Signed request:
+Action types:
 
+```tlb
+// Standard actions from block.tlb:
+out_list_empty$_ = OutList 0;
+out_list$_ {n:#} prev:^(OutList n) action:OutAction
+  = OutList (n + 1);
+action_send_msg#0ec3c86d mode:(## 8) 
+  out_msg:^(MessageRelaxed Any) = OutAction;
+action_set_code#ad4de08e new_code:^Cell = OutAction;
+action_reserve_currency#36e6b809 mode:(## 8)
+  currency:CurrencyCollection = OutAction;
+libref_hash$0 lib_hash:bits256 = LibRef;
+libref_ref$1 library:^Cell = LibRef;
+action_change_library#26fa1dd4 mode:(## 7) { mode <= 2 }
+  libref:LibRef = OutAction;
+
+// Extended actions in W5:
+action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;
+action_list_extended$1 {m:#} {n:#} prev:^(ActionList n m) action:ExtendedAction = ActionList n (m+1);
+
+action_set_data#1ff8ea0b data:^Cell = ExtendedAction;
+action_add_ext#1c40db9f code_hash:uint256 = ExtendedAction;
+action_delete_ext#5eaef4a4 code_hash:uint256 = ExtendedAction;
 ```
+
+Authentication modes:
+
+```tlb
 signed_request$_ 
   signature:    bits512                   // 512
   subwallet_id: uint32                    // 512+32
   valid_until:  uint32                    // 512+32+32
   msg_seqno:    uint32                    // 512+32+32+32 = 608
-  inner: InnerRequest = SignedRequest;       
-```
+  inner: InnerRequest = SignedRequest;
 
-Internal message from extension:
+internal_signed#7369676E signed:SignedRequest = InternalMsgBody;
+internal_extension#6578746E code:^Cell data:^Cell inner:InnerRequest = InternalMsgBody;
+external_signed#7369676E signed:SignedRequest = ExternalMsgBody;
 
-```
-internal_extension#6578746E 
-   code:^Cell
-   data:^Cell
-   inner:InnerRequest 
-= InternalMsgBody;
-```
-
-Internal message carrying a signed request:
-
-```
-internal_signed#7369676E
-   signed:SignedRequest
-= InternalMsgBody;
-```
-
-Arbitrary transfer or notification (no-op):
-```
-other$_ = InternalMsgBody
-```
-
-There are 4 types of concrete requests (`InnerRequest`). 
-
-Opcode 0x00: sending a message.
-
-```
-msg_request$00 sendmode:uint8 rawmsg:^Cell = InnerRequest;
-```
-
-Opcode 0x01: adding extension.
-
-```
-extend_request$01 code:^Cell = InnerRequest;
-```
-
-Opcode 0x02: removing extension.
-
-```
-remove_request$10 code:^Cell = InnerRequest;
-```
-
-Opcode 0x03: tail-call into more requests.
-
-```
-nested_request$11 inner:^InnerRequest = InnerRequest;
+actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 ```
 
 
-## Code
+## Source code
 
-```c
+```func
 #pragma version =0.2.0;
 
 ;; Extensible wallet contract v5
@@ -155,7 +184,7 @@ nested_request$11 inner:^InnerRequest = InnerRequest;
 (slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
 (cell, int) dict_add_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTADDB";
 (cell, int) dict_delete?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTDEL";
-
+() set_actions(cell action_list) impure asm "c5 POP";
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
 () process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
@@ -192,30 +221,28 @@ nested_request$11 inner:^InnerRequest = InnerRequest;
 ;; - process more requests recursively
 () dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
 
-  ;; Read all the requests until we run out of bits.
-  while (cs.slice_refs()) {
-      int op = cs~load_uint(2);
+  ;; Recurse into extended actions until we reach standard actions
+  while (cs~load_uint(1)) {
+      int op = cs~load_uint(4);
       
-      ;; Emit raw message with a given sendmode.
-      if (op == 0) {
-          var mode = cs~load_uint(8);
-          send_raw_message(cs~load_ref(), mode);
+      ;; Raw set_data 
+      if (op == 0x1ff8ea0b) {
+          set_data(cs~load_ref());
       }
       
       ;; Add/remove extensions
-      if (op == 1 || op == 2) {
-          cell ext_code = cs~load_ref();
-          int key = cell_hash(ext_code);
+      if (op == 0x1c40db9f || op == 0x5eaef4a4) {
+          int code_hash = cs~load_uint(256);
           ;; Add extension
-          if (op == 1) {
-              (extensions, int success?) = extensions.dict_add_builder?(256, key, begin_cell());
+          if (op == 0x1c40db9f) {
+              (extensions, int success?) = extensions.dict_add_builder?(256, code_hash, begin_cell());
               throw_unless(39, success?);
           }
           ;; Remove extension
-          if (op == 2) {
-              (extensions, int success?) = extensions.dict_delete?(256, key);
+          if (op == 0x5eaef4a4) {
+              (extensions, int success?) = extensions.dict_delete?(256, code_hash);
               throw_unless(39, success?);
-          }    
+          }
      
           set_data(begin_cell()
             .store_uint(stored_seqno, 32)
@@ -224,13 +251,14 @@ nested_request$11 inner:^InnerRequest = InnerRequest;
             .store_dict(extensions)
             .end_cell());
       }
-      
-      ;; Tail-call into a ref to process more requests. 
-      ;; This terminates iteration of the refs in this cell.
-      if (op == 3) {
-          cs = cs~load_ref().begin_parse()
-      }
+
+      ;; Other actions are no-op
+
+      cs = cs~load_ref().begin_parse()
   }
+  ;; At this point we are `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
+  ;; Simply set the C5 register with all pre-computed actions:
+  set_actions(cs~load_ref());
   return ();
 }
 
@@ -238,7 +266,12 @@ nested_request$11 inner:^InnerRequest = InnerRequest;
   var ds = get_data().begin_parse();
   var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
   ds.end_parse();
-  process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+  int auth_kind = body~load_uint(32);
+  if (auth_kind == 0x7369676E) { ;; "sign"
+    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+  } else {
+    throw(40);
+  }
 }
 
 
@@ -271,6 +304,11 @@ nested_request$11 inner:^InnerRequest = InnerRequest;
     ;; Note that some random contract may have deposited funds with this prefix, 
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     
+    ;; FIXME:
+    ;; In this revision we send full code+data refs instead of their hashes.
+    ;; In the future this should be optimized either with pruned cells or
+    ;; with an explicit pair of 256-bit strings in the body.
+    ;; Also consider subden's hack: transfer code+data in the stateinit for this wallet.
     (cell code, cell data) = (body~load_ref(), body~load_ref());
     var (_, success?) = extensions.dict_get?(256, cell_hash(code));
     if ~(success?) {
@@ -328,5 +366,3 @@ tuple get_extensions_list() method_id {
   return list;
 }
 ```
-
-
