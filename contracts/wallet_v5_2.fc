@@ -4,10 +4,59 @@
 
 ;; Extensible wallet contract v5
 
-(slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
-(cell, int) dict_add_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTADDB";
-(cell, int) dict_delete?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTDEL";
+(slice, int) dict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGET" "NULLSWAPIFNOT";
+(cell, int) dict_add_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUADDB";
+(cell, int) dict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDEL";
 () set_actions(cell action_list) impure asm "c5 POP";
+
+;; Dispatches already authenticated request based on a 2-bit opcode: 
+;; - emit message
+;; - install extension
+;; - remove extension
+;; - process more requests recursively
+() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
+
+  ;; Recurse into extended actions until we reach standard actions
+  while (cs~load_uint(1)) {
+      int op = cs~load_uint(4);
+      
+      ;; Raw set_data 
+      if (op == 0x1ff8ea0b) {
+          set_data(cs~load_ref());
+      }
+      
+      ;; Add/remove extensions
+      if ((op == 0x1c40db9f) | (op == 0x5eaef4a4)) {
+          int code_hash = cs~load_uint(256);
+          ;; Add extension
+          if (op == 0x1c40db9f) {
+              (extensions, int success?) = extensions.dict_add_builder?(256, code_hash, begin_cell());
+              throw_unless(39, success?);
+          }
+          ;; Remove extension
+          if (op == 0x5eaef4a4) {
+              (extensions, int success?) = extensions.dict_delete?(256, code_hash);
+              throw_unless(39, success?);
+          }
+     
+          set_data(begin_cell()
+            .store_uint(stored_seqno, 32)
+            .store_uint(stored_subwallet, 32)
+            .store_uint(public_key, 256)
+            .store_dict(extensions)
+            .end_cell());
+      }
+
+      ;; Other actions are no-op
+      ;; FIXME: is it costlier to check for unsupported actions and throw?
+
+      cs = cs~load_ref().begin_parse();
+  }
+  ;; At this point we are `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
+  ;; Simply set the C5 register with all pre-computed actions:
+  set_actions(cs~load_ref());
+  return ();
+}
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
 () process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
@@ -34,56 +83,6 @@
   commit();
 
   dispatch_request(cs, stored_seqno, stored_subwallet, public_key, extensions);
-}
-
-
-;; Dispatches already authenticated request based on a 2-bit opcode: 
-;; - emit message
-;; - install extension
-;; - remove extension
-;; - process more requests recursively
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
-
-  ;; Recurse into extended actions until we reach standard actions
-  while (cs~load_uint(1)) {
-      int op = cs~load_uint(4);
-      
-      ;; Raw set_data 
-      if (op == 0x1ff8ea0b) {
-          set_data(cs~load_ref());
-      }
-      
-      ;; Add/remove extensions
-      if (op == 0x1c40db9f || op == 0x5eaef4a4) {
-          int code_hash = cs~load_uint(256);
-          ;; Add extension
-          if (op == 0x1c40db9f) {
-              (extensions, int success?) = extensions.dict_add_builder?(256, code_hash, begin_cell());
-              throw_unless(39, success?);
-          }
-          ;; Remove extension
-          if (op == 0x5eaef4a4) {
-              (extensions, int success?) = extensions.dict_delete?(256, code_hash);
-              throw_unless(39, success?);
-          }
-     
-          set_data(begin_cell()
-            .store_uint(stored_seqno, 32)
-            .store_uint(stored_subwallet, 32)
-            .store_uint(public_key, 256)
-            .store_dict(extensions)
-            .end_cell());
-      }
-
-      ;; Other actions are no-op
-      ;; FIXME: is it costlier to check for unsupported actions and throw?
-
-      cs = cs~load_ref().begin_parse()
-  }
-  ;; At this point we are `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
-  ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs~load_ref());
-  return ();
 }
 
 () recv_external(slice body) impure {
@@ -142,7 +141,7 @@
     ;; Check that the sender indeed has the declared code in its contract.
     (_, int sender_addr_hash) = parse_std_addr(full_msg_slice~load_msg_addr());
     cell state_init = begin_cell().store_uint(0, 2).store_dict(code).store_dict(data).store_uint(0, 1).end_cell();
-    if !(sender_addr_hash == cell_hash(state_init)) {
+    if ~(sender_addr_hash == cell_hash(state_init)) {
       return (); ;; sender is not our extension
     }
     
@@ -174,7 +173,7 @@ int get_public_key() method_id {
 int has_extension(int code_hash) method_id {
   var ds = get_data().begin_parse().skip_bits(32 + 32 + 256);
   var extensions = ds~load_dict();
-  var (_, success?) = extensions.dict_get?(256, begin_cell().store_uint(code_hash, 256).end_cell().begin_parse());
+  var (_, success?) = extensions.dict_get?(256, code_hash);
   return success?;
 }
 
@@ -183,9 +182,9 @@ tuple get_extensions_list() method_id {
   var ds = get_data().begin_parse().skip_bits(32 + 32 + 256);
   var extensions = ds~load_dict();
   do {
-    var (slice, _, f) = extensions~dict::delete_get_min(256);
+    var (s, _, f) = extensions~dict::delete_get_min(256);
     if (f) {
-      list = cons(slice~load_uint(256), list);
+      list = cons(s~load_uint(256), list);
     }
   } until (~ f);
   return list;

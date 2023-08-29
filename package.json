@@ -6,6 +6,7 @@
         "build": "blueprint build",
         "build:w5_1": "blueprint build Wallet_V5_1",
         "build:w5_2": "blueprint build Wallet_V5_2",
+        "build:w4_2": "blueprint build Wallet_V4_2",
         "test": "jest"
     },
     "devDependencies": {
