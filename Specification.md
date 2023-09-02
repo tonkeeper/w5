@@ -8,6 +8,7 @@ This is an extensible wallet specification aimed at replacing V4 and allowing ar
 * [Overview](#overview)
 * [Discussion](#discussion)
 * [Wallet ID](#wallet-id)
+* [Packed address](#packed-address)
 * [TL-B definitions](#tl-b-definitions)
 * [Source code](#source-code)
 
@@ -16,7 +17,7 @@ This is an extensible wallet specification aimed at replacing V4 and allowing ar
 
 Thanks to [Andrew Gutarev](https://github.com/pyAndr3w) for the idea to set c5 register to a [list of pre-composed actions](https://github.com/pyAndr3w/ton-preprocessed-wallet-v2).
 
-Thanks to [@subden](https://t.me/subden) and [@botpult](https://t.me/botpult) for ideas and discussion.
+Thanks to [@subden](https://t.me/subden), [@botpult](https://t.me/botpult) and [@tvorogme](https://t.me/tvorogme) for ideas and discussion.
 
 
 ## Features
@@ -62,29 +63,34 @@ User may delegate this job to other apps via extensions.
 
 ### Extending the wallet
 
-**A. Code optimization**
+**A. Use extensions**
 
-Backwards compatible code optimization **can be performed** with a single `set_code` action (`action_set_code#ad4de08e`) signed by the user. That is, hypothetical upgrade from v5R1 to v5R2 can be done in-place without forcing users to change wallet address.
+The best way to extend functionality of the wallet is to use the extensions mechanism that permit delegating access to the wallet to other contracts.
+
+From the perspective of the wallet, every extension can perform the same actions as the owner of a private key. Therefore limits and capabilities can be embedded in such an extension with a custom storage scheme.
+
+Extensions can co-exist simultaneously, so experimental capabilities can be deployed and tested independently from each other.
+
+**B. Code optimization**
+
+Backwards compatible code optimization **can be performed** with a single `set_code` action (`action_set_code#ad4de08e`) signed by the user. That is, hypothetical upgrade from `v5R1` to `v5R2` can be done in-place without forcing users to change their wallet address.
 
 If the optimized code requires changes to the data layout (e.g. reordering fields) the user can sign a request with two actions: `set_code` (in the standard action) and `set_data` (an extended action per this specification). Note that `set_data` action must make sure `seqno` is properly incremented after the upgrade as to prevent replays. Also, `set_data` must be performed right before the standard actions to not get overwritten by extension actions.
 
 User agents **should not** make `set_code` and `set_data` actions available via general-purpose API to prevent misuse and mistakes. Instead, they should be used as a part of migration logic for a specific wallet code.
 
-**B. Substantial upgrades**
+To restore the wallet by a seed phrase, user agent should use the original code and should expect the upgraded code to work in exactly the same way as previously.
+
+**C. Emergency upgrades**
+
+This is a variant of (B), but may require modifying some functionality as to prevent user from suffering loss of funds.
+
+**D. Substantial upgrades**
 
 We **do not recommend** performing substantial wallet upgrades in-place using `set_code`/`set_data` actions. Instead, user agents should have support for multiple accounts and easy switching between them.
 
 In-place migration requires maintaining backwards compatibility for all wallet features, which in turn could lead to increase in code size and higher gas and rent costs.
 
-**C. Delegation/Capabilities schemes**
-
-We recommend trying out new wallet capabilities via the extensions scheme instead of upgrading the wallet code.
-
-Wallet V5 supports scalable extensions that permit delegating access to the wallet to other contracts.
-
-From the perspective of the wallet, every extension can perform the same actions as the user. Therefore limits and capabilities can be embedded in such an extension with a custom storage scheme.
-
-Extensions can co-exist simultaneously, so experimental capabilities can be deployed and tested independently from each other.
 
 ### Can the wallet outsource payment for gas fees?
 
@@ -128,6 +134,20 @@ mainnet: 20230823 + workchain
 testnet: 30230823 + workchain
 ```
 
+## Packed address
+
+To make authorize extensions efficiently we compress 260-bit address (workchain + sha256 of stateinit) into a 256-bit integer:
+
+```
+int addr = addr_hash ^ (wc + 1)
+```
+
+Previously deployed wallet v4 was packing the address into a cell which costs ≈500 gas, while access to dictionary costs approximately `120*lg2(N)` in gas, that is serialization occupies more than half of the access cost for wallets with up to 16 extensions. This design makes packing cost around 50 gas and allows cutting the authentication cost 2-3x for reasonably sized wallets.
+
+As of 2023 TON network consists of two workchains: -1 (master) and 0 (base). This means that the proposed address packing reduces second-preimage resistance of sha256 by 1 bit which we consider negligible. Even if the network is expanded with 254 more workchains in a distant future, our scheme would reduce security of extension authentication by only 8 bits down to 248 bits. Note that birthday attack is irrelevant in our setting as the user agent is not installing random extensions, although the security margin is plenty anyway (124 bits).
+
+
+
 ## TL-B definitions
 
 Action types:
@@ -152,8 +172,8 @@ action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;
 action_list_extended$1 {m:#} {n:#} prev:^(ActionList n m) action:ExtendedAction = ActionList n (m+1);
 
 action_set_data#1ff8ea0b data:^Cell = ExtendedAction;
-action_add_ext#1c40db9f code_hash:uint256 = ExtendedAction;
-action_delete_ext#5eaef4a4 code_hash:uint256 = ExtendedAction;
+action_add_ext#1c40db9f addr:MsgAddressInt = ExtendedAction;
+action_delete_ext#5eaef4a4 addr:MsgAddressInt = ExtendedAction;
 ```
 
 Authentication modes:
@@ -167,7 +187,7 @@ signed_request$_
   inner: InnerRequest = SignedRequest;
 
 internal_signed#7369676E signed:SignedRequest = InternalMsgBody;
-internal_extension#6578746E code:^Cell data:^Cell inner:InnerRequest = InternalMsgBody;
+internal_extension#6578746E inner:InnerRequest = InternalMsgBody;
 external_signed#7369676E signed:SignedRequest = ExternalMsgBody;
 
 actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
@@ -176,195 +196,4 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 
 ## Source code
 
-```func
-#pragma version =0.2.0;
-
-;; Extensible wallet contract v5
-
-(slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
-(cell, int) dict_add_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTADDB";
-(cell, int) dict_delete?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTDEL";
-() set_actions(cell action_list) impure asm "c5 POP";
-
-;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
-  var signature = body~load_bits(512);
-  var cs = body;
-  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(32), cs~load_uint(32), cs~load_uint(32));
-  
-  throw_if(36, valid_until <= now());
-  throw_unless(33, msg_seqno == stored_seqno); 
-  throw_unless(34, subwallet_id == stored_subwallet);
-  throw_unless(35, check_signature(slice_hash(body), signature, public_key));
-  
-  accept_message();
-  
-  ;; Store and commit the seqno increment to prevent replays even if the requests fail.
-  stored_seqno = stored_seqno + 1;
-  set_data(begin_cell()
-    .store_uint(stored_seqno, 32)
-    .store_uint(stored_subwallet, 32)
-    .store_uint(public_key, 256)
-    .store_dict(extensions)
-    .end_cell());
-
-  commit();
-
-  dispatch_request(cs, stored_seqno, stored_subwallet, public_key, extensions);
-}
-
-
-;; Dispatches already authenticated request based on a 2-bit opcode: 
-;; - emit message
-;; - install extension
-;; - remove extension
-;; - process more requests recursively
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
-
-  ;; Recurse into extended actions until we reach standard actions
-  while (cs~load_uint(1)) {
-      int op = cs~load_uint(4);
-      
-      ;; Raw set_data 
-      if (op == 0x1ff8ea0b) {
-          set_data(cs~load_ref());
-      }
-      
-      ;; Add/remove extensions
-      if (op == 0x1c40db9f || op == 0x5eaef4a4) {
-          int code_hash = cs~load_uint(256);
-          ;; Add extension
-          if (op == 0x1c40db9f) {
-              (extensions, int success?) = extensions.dict_add_builder?(256, code_hash, begin_cell());
-              throw_unless(39, success?);
-          }
-          ;; Remove extension
-          if (op == 0x5eaef4a4) {
-              (extensions, int success?) = extensions.dict_delete?(256, code_hash);
-              throw_unless(39, success?);
-          }
-     
-          set_data(begin_cell()
-            .store_uint(stored_seqno, 32)
-            .store_uint(stored_subwallet, 32)
-            .store_uint(public_key, 256)
-            .store_dict(extensions)
-            .end_cell());
-      }
-
-      ;; Other actions are no-op
-      ;; FIXME: is it costlier to check for unsupported actions and throw?
-
-      cs = cs~load_ref().begin_parse()
-  }
-  ;; At this point we are `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
-  ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs~load_ref());
-  return ();
-}
-
-() recv_external(slice body) impure {
-  var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
-  int auth_kind = body~load_uint(32);
-  if (auth_kind == 0x7369676E) { ;; "sign"
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  } else {
-    ;; FIXME: probably need to throw here?
-    return ();
-  }
-}
-
-
-() recv_internal(int msg_value, cell full_msg, slice body) impure {
-  var full_msg_slice = full_msg.begin_parse();
-  var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
-  if (flags & 1) {
-    ;; ignore all bounced messages
-    return ();
-  }
-  if (body.slice_bits() < 32) {
-    ;; ignore simple transfers
-    return ();
-  }
-  int auth_kind = body~load_uint(32);
-
-  ;; We accept two kinds of authenticated messages:
-  ;; - 0x6578746E "extn" authenticated by extension
-  ;; - 0x7369676E "sign" authenticated by signature
-  if (auth_kind != 0x6578746E) & (auth_kind != 0x7369676E) { ;; "extn" & "sign"
-    ;; ignore all unauthenticated messages 
-    return ();
-  }
-  
-  var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
-  
-  if (auth_kind == 0x6578746E) { ;; "extn"
-    ;; Note that some random contract may have deposited funds with this prefix, 
-    ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-    
-    ;; FIXME:
-    ;; In this revision we send full code+data refs instead of their hashes.
-    ;; In the future this should be optimized either with pruned cells or
-    ;; with an explicit pair of 256-bit strings in the body.
-    ;; Also consider subden's hack: transfer code+data in the stateinit for this wallet.
-    (cell code, cell data) = (body~load_ref(), body~load_ref());
-    var (_, success?) = extensions.dict_get?(256, cell_hash(code));
-    if ~(success?) {
-      return (); ;; did not find extension
-    }
-    ;; Check that the sender indeed has the declared code in its contract.
-    (_, int sender_addr_hash) = parse_std_addr(full_msg_slice~load_msg_addr());
-    cell state_init = begin_cell().store_uint(0, 2).store_dict(code).store_dict(data).store_uint(0, 1).end_cell();
-    if !(sender_addr_hash == cell_hash(state_init)) {
-      return (); ;; sender is not our extension
-    }
-    
-    ;; The remainder of the body (up to 2 refs) can now be dispatched
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  }
-  if (auth_kind == 0x7369676E) { ;; "sign"
-    ;; Process the rest of the slice just like the signed request.
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  }
-}
-
-
-;; Get methods
-
-int seqno() method_id {
-  return get_data().begin_parse().preload_uint(32);
-}
-
-int get_subwallet_id() method_id {
-  return get_data().begin_parse().skip_bits(32).preload_uint(32);
-}
-
-int get_public_key() method_id {
-  var cs = get_data().begin_parse().skip_bits(64);
-  return cs.preload_uint(256);
-}
-
-int has_extension(int code_hash) method_id {
-  var ds = get_data().begin_parse().skip_bits(32 + 32 + 256);
-  var extensions = ds~load_dict();
-  var (_, success?) = extensions.dict_get?(256, begin_cell().store_uint(code_hash, 256).end_cell().begin_parse());
-  return success?;
-}
-
-tuple get_extensions_list() method_id {
-  var list = null();
-  var ds = get_data().begin_parse().skip_bits(32 + 32 + 256);
-  var extensions = ds~load_dict();
-  do {
-    var (slice, _, f) = extensions~dict::delete_get_min(256);
-    if (f) {
-      list = cons(slice~load_uint(256), list);
-    }
-  } until (~ f);
-  return list;
-}
-```
+See [contracts/wallet_v5_3.fc].
