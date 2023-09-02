@@ -22,13 +22,13 @@ Thanks to [@subden](https://t.me/subden), [@botpult](https://t.me/botpult) and [
 
 ## Features
 
+* 32% smaller compiled code than in v4R2 (495 vs 734).
 * Arbitrary amount of outgoing messages is supported via action list.
 * Wallet code can be upgraded transparently without breaking user's address in the future.
-* Unlimited number of plugins can be deployed sharing the same code.
 * Wallet code can be extended by anyone in a decentralized and conflict-free way: multiple feature extensions can co-exist.
 * Extensions can perform the same operations as the signer: emit arbitrary messages on behalf of the owner, add and remove extensions.
 * Signed requests can be delivered via internal message to allow 3rd party pay for gas.
-* Extensible ABI for future additions.
+* For consistency and ease of indexing, external messages also receive a 32-bit opcode.
 
 ## Overview
 
@@ -40,7 +40,7 @@ Authentication:
 
 Operation types:
 * standard output actions
-* “set data”
+* “set data” operation
 * install extension
 * remove extension
 
@@ -83,7 +83,12 @@ To restore the wallet by a seed phrase, user agent should use the original code 
 
 **C. Emergency upgrades**
 
-This is a variant of (B), but may require modifying some functionality as to prevent user from suffering loss of funds.
+This is a variant of (B), so the same consideration apply. The difference is that functionality may be modified as to prevent user from suffering loss of funds. E.g. some previously possible actions or signed messages would lead to a failure.
+
+Just like with (B), user agents **should not** make `set_code` and `set_data` actions available via general-purpose API to prevent misuse and mistakes. Instead, they should be used as a part of migration logic for a specific wallet code.
+
+New users’ wallets **should not** be deployed with upgraded code. Instead, the improved wallet code should also be released as a new wallet version (e.g. v6, with a separate subwallet ID) and new wallets should be deployed with that code. This way `set_code` would be used as an emergency patch for existing wallets, while new wallets would be deployed directly with the major next version.
+
 
 **D. Substantial upgrades**
 
@@ -95,10 +100,6 @@ In-place migration requires maintaining backwards compatibility for all wallet f
 ### Can the wallet outsource payment for gas fees?
 
 Yes! You can deliver signed messages via an internal message from a 3rd party wallet. Also, the message is handled exactly like an external one: after the basic checks the wallet takes care of the fees itself, so that 3rd party does not need to overpay for users who actually do have TONs.
-
-### Does the wallet grow with number of plugins?
-
-Not really. Wallet only accumulates code extensions. So if even you have 100500 plugins based on just three types of contracts, your wallet would only store extra ≈96 bytes of data.
 
 ### Can plugins implement subscriptions that collect tokens?
 
@@ -114,13 +115,13 @@ Plugin does not need to remove its extension code from the wallet — they can s
 
 ### How can I deploy a plugin, install its code and send it a message in one go?
 
-You need two requests in your message body: first one installs the extension code, the second one sends raw message to your plugin address.
+You need to put two requests in your message body:
+1. add extension address,
+2. send a message to that address.
 
-### How does the wallet know which plugins it has installed?
+### Does the wallet grow with number of plugins?
 
-Extension contracts are designed in such way that each one checks that it was deployed by its proper wallet. For an example of this initialization pattern see how NFT items or jetton wallets do that. 
-
-Your wallet can only trust the extension code that was audited to perform such authenticated initialization. Users are not supposed to install arbitrary extensions unknown to the user agent.
+Yes. We have considered constant-size schemes where the wallet only stores trusted extension code. However, extension authentication becomes combursome and expensive: plugin needs to transmit additional data and each request needs to recompute plugin’s address. We estimate that for the reasonably sized wallets (less than 100 plugins) authentication via the dictionary lookup would not exceed costs of indirect address authentication.
 
 
 ## Wallet ID
