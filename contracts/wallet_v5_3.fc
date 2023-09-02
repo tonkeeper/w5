@@ -127,11 +127,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   
   if (auth_kind == 0x6578746E) { ;; "extn"
     ;; Authenticate extension by its address.
-    (int sender_wc, int sender_hash) = parse_std_addr(full_msg_slice~load_msg_addr());
-    int packed_sender_addr = pack_address(sender_wc, sender_hash);
-    var (wc_slice, success?) = extensions.udict_get?(256, packed_sender_addr);
-    int stored_wc = wc_slice~load_int(8);
-    if (~(success?)) | (sender_wc != stored_wc) {
+    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
+    var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
+    if ~(success?) {
       ;; Note that some random contract may have deposited funds with this prefix,
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
