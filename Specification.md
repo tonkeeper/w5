@@ -111,13 +111,13 @@ Plugin needs to send a request with a message to its own address.
 
 ### How can a plugin self-destruct?
 
-Plugin does not need to remove its extension code from the wallet — they can simply self-destroy by sending all TONs to the wallet with sendmode 128.
+Plugin can self-destroy by sending all TONs to the wallet with sendmode 128 and adding one more action that removes itself from the list.
 
 ### How can I deploy a plugin, install its code and send it a message in one go?
 
 You need to put two requests in your message body:
-1. add extension address,
-2. send a message to that address.
+1. add the extension address,
+2. send a message with stateinit to that address.
 
 ### Does the wallet grow with number of plugins?
 
@@ -197,4 +197,4 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 
 ## Source code
 
-See [contracts/wallet_v5_3.fc].
+See [contracts/wallet_v5_3.fc](contracts/wallet_v5_3.fc).
