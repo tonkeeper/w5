@@ -1,10 +1,12 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
-import { Address, beginCell, Cell, Dictionary, toNano } from 'ton-core';
+import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
 import { WalletV5 } from '../wrappers/WalletV5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
-import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
-import { bufferToBigInt, packAddress } from './utils';
+import { KeyPair, getSecureRandomBytes, keyPairFromSeed, sign } from 'ton-crypto';
+import { bufferToBigInt, packAddress, validUntil } from './utils';
+
+const SUBWALLET_ID = 20230823 + 0;
 
 describe('Wallet_V5_3', () => {
     let code: Cell;
@@ -16,6 +18,7 @@ describe('Wallet_V5_3', () => {
     let blockchain: Blockchain;
     let walletV5: SandboxContract<WalletV5>;
     let keypair: KeyPair;
+    let sender: Sender;
 
     async function deploy(params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>) {
         blockchain = await Blockchain.create();
@@ -27,7 +30,7 @@ describe('Wallet_V5_3', () => {
             WalletV5.createFromConfig(
                 {
                     seqno: params?.seqno ?? 0,
-                    subwallet: params?.subwallet ?? 20230823 + 0,
+                    subwallet: params?.subwallet ?? SUBWALLET_ID,
                     publicKey: params?.publicKey ?? keypair.publicKey,
                     extensions: params?.extensions ?? Dictionary.empty()
                 },
@@ -36,8 +39,9 @@ describe('Wallet_V5_3', () => {
         );
 
         const deployer = await blockchain.treasury('deployer');
+        sender = deployer.getSender();
 
-        const deployResult = await walletV5.sendDeploy(deployer.getSender(), toNano('0.05'));
+        const deployResult = await walletV5.sendDeploy(sender, toNano('0.05'));
         return { deployer, deployResult };
     }
 
@@ -88,5 +92,65 @@ describe('Wallet_V5_3', () => {
             .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell())
             .endCell();
         expect(actual.equals(expected)).toBeTruthy();
+    });
+
+    it('Send simple transfer', async () => {
+        const seqno = 0;
+
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const sendTxMsg = beginCell()
+            .storeUint(0x10, 6)
+            .storeAddress(testReceiver)
+            .storeCoins(forwardValue)
+            .storeUint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .storeRef(beginCell().endCell())
+            .endCell();
+
+        const sendTxactionAction = beginCell()
+            .storeUint(0x0ec3c86d, 32)
+            .storeUint(SendMode.PAY_GAS_SEPARATELY, 8)
+            .storeRef(sendTxMsg)
+            .endCell();
+
+        const actionsList = beginCell()
+            .storeRef(beginCell().endCell())
+            .storeSlice(sendTxactionAction.beginParse())
+            .endCell();
+
+        const payload = beginCell()
+            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(validUntil(), 32)
+            .storeUint(seqno, 32)
+            .storeUint(0, 1)
+            .storeRef(actionsList)
+            .endCell();
+
+        const signature = sign(payload.hash(), keypair.secretKey);
+        const body = beginCell()
+            .storeUint(bufferToBigInt(signature), 512)
+            .storeSlice(payload.beginParse())
+            .endCell();
+
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body
+        });
+
+        expect(receipt.transactions.length).toEqual(3);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const fee = receipt.transactions[2].totalFees.coins;
+
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 });

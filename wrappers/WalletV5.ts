@@ -65,7 +65,10 @@ export class WalletV5 implements Contract {
         await provider.internal(via, {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(Opcodes.sign, 32).storeRef(opts.body).endCell()
+            body: beginCell()
+                .storeUint(Opcodes.sign, 32)
+                .storeSlice(opts.body.beginParse())
+                .endCell()
         });
     }
 

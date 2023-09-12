@@ -2,3 +2,4 @@ node_modules
 temp
 build
 .idea
+types.tlb
