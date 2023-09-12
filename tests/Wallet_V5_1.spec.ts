@@ -22,11 +22,11 @@ describe('Wallet_V5_1', () => {
 
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
-                {   
+                {
                     seqno: 0,
                     subwallet: 20230823 + 0,
                     publicKey: keypair.publicKey,
-                    extensions: Dictionary.empty(),
+                    extensions: Dictionary.empty()
                 },
                 code
             )
@@ -40,7 +40,7 @@ describe('Wallet_V5_1', () => {
             from: deployer.address,
             to: walletV5.address,
             deploy: true,
-            success: true,
+            success: true
         });
     });
 
@@ -48,5 +48,4 @@ describe('Wallet_V5_1', () => {
         // the check is done inside beforeEach
         // blockchain and walletV5 are ready to use
     });
-
 });
