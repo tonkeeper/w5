@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/WalletV5';
+import { Opcodes, WalletV5 } from '../wrappers/WalletV5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { KeyPair, getSecureRandomBytes, keyPairFromSeed, sign } from 'ton-crypto';
@@ -81,22 +81,23 @@ describe('Wallet_V5_3', () => {
         const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const plugin2 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
 
-        const extensions: Dictionary<bigint, Cell> = Dictionary.empty();
-        extensions.set(packAddress(plugin1), beginCell().storeInt(plugin1.workChain, 8).endCell());
-        extensions.set(packAddress(plugin2), beginCell().storeInt(plugin1.workChain, 8).endCell());
+        const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
+            Dictionary.Keys.BigUint(256),
+            Dictionary.Values.BigInt(8)
+        );
+        extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
+        extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
 
         await deploy({ extensions });
 
         const actual = await walletV5.getExtensions();
         const expected = beginCell()
-            .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell())
+            .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
             .endCell();
         expect(actual.equals(expected)).toBeTruthy();
     });
 
-    it('Send simple transfer', async () => {
-        const seqno = 0;
-
+    it('Send a simple transfer', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
@@ -111,22 +112,26 @@ describe('Wallet_V5_3', () => {
             .endCell();
 
         const sendTxactionAction = beginCell()
-            .storeUint(0x0ec3c86d, 32)
+            .storeUint(Opcodes.action_send_msg, 32)
             .storeUint(SendMode.PAY_GAS_SEPARATELY, 8)
             .storeRef(sendTxMsg)
             .endCell();
 
         const actionsList = beginCell()
-            .storeRef(beginCell().endCell())
-            .storeSlice(sendTxactionAction.beginParse())
+            .storeUint(0, 1)
+            .storeRef(
+                beginCell()
+                    .storeRef(beginCell().endCell())
+                    .storeSlice(sendTxactionAction.beginParse())
+                    .endCell()
+            )
             .endCell();
 
         const payload = beginCell()
             .storeUint(SUBWALLET_ID, 32)
             .storeUint(validUntil(), 32)
-            .storeUint(seqno, 32)
-            .storeUint(0, 1)
-            .storeRef(actionsList)
+            .storeUint(0, 32) // seqno
+            .storeSlice(actionsList.beginParse())
             .endCell();
 
         const signature = sign(payload.hash(), keypair.secretKey);
@@ -152,5 +157,52 @@ describe('Wallet_V5_3', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
+    });
+
+    it('Add an extension', async () => {
+        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+
+        const addExtensionAction = beginCell()
+            .storeUint(Opcodes.action_extended_add_extension, 32)
+            .storeAddress(testExtension)
+            .endCell();
+
+        const actionsList = beginCell()
+            .storeUint(1, 1)
+            .storeRef(beginCell().storeUint(0, 1).storeRef(beginCell().endCell()).endCell())
+            .storeSlice(addExtensionAction.beginParse())
+            .endCell();
+
+        const payload = beginCell()
+            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(validUntil(), 32)
+            .storeUint(0, 32) // seqno
+            .storeSlice(actionsList.beginParse())
+            .endCell();
+
+        const signature = sign(payload.hash(), keypair.secretKey);
+        const body = beginCell()
+            .storeUint(bufferToBigInt(signature), 512)
+            .storeSlice(payload.beginParse())
+            .endCell();
+
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body
+        });
+
+        expect(receipt.transactions.length).toEqual(2);
+
+        const extensions = await walletV5.getExtensions();
+        const extensionsDict = Dictionary.loadDirect(
+            Dictionary.Keys.BigUint(256),
+            Dictionary.Values.BigInt(8),
+            extensions
+        );
+
+        expect(extensionsDict.size).toEqual(1);
+
+        const storedWC = extensionsDict.get(packAddress(testExtension));
+        expect(storedWC).toEqual(BigInt(testExtension.workChain));
     });
 });

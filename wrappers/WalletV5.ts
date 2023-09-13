@@ -14,7 +14,7 @@ export type WalletV5Config = {
     seqno: number;
     subwallet: number;
     publicKey: Buffer;
-    extensions: Dictionary<bigint, Cell>;
+    extensions: Dictionary<bigint, bigint>;
 };
 
 export function walletV5ConfigToCell(config: WalletV5Config): Cell {
@@ -22,15 +22,20 @@ export function walletV5ConfigToCell(config: WalletV5Config): Cell {
         .storeUint(config.seqno, 32)
         .storeUint(config.subwallet, 32)
         .storeBuffer(config.publicKey, 32)
-        .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell())
+        .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
         .endCell();
 }
 
 export const Opcodes = {
-    add: 0x1c40db9f,
-    remove: 0x5eaef4a4,
-    extn: 0x6578746e,
-    sign: 0x7369676e
+    action_send_msg: 0x0ec3c86d,
+    action_set_code: 0xad4de08e,
+    action_reserve_currency: 0x36e6b809,
+    action_change_library: 0x26fa1dd4,
+    action_extended_set_data: 0x1ff8ea0b,
+    action_extended_add_extension: 0x1c40db9f,
+    action_extended_remove_extension: 0x5eaef4a4,
+    auth_extension: 0x6578746e,
+    auth_signed: 0x7369676e
 };
 
 export class WalletV5 implements Contract {
@@ -66,7 +71,7 @@ export class WalletV5 implements Contract {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Opcodes.sign, 32)
+                .storeUint(Opcodes.auth_signed, 32)
                 .storeSlice(opts.body.beginParse())
                 .endCell()
         });
