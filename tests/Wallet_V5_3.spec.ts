@@ -5,7 +5,7 @@ import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
 import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './utils';
-import { ActionSendMsg, packActionsList } from './actions';
+import { ActionAddExtension, ActionSendMsg, packActionsList } from './actions';
 
 const SUBWALLET_ID = 20230823 + 0;
 
@@ -270,5 +270,55 @@ describe('Wallet_V5_3', () => {
 
         expect(receiver1BalanceAfter).toEqual(receiver1BalanceBefore + forwardValue1 - fee1);
         expect(receiver2BalanceAfter).toEqual(receiver2BalanceBefore + forwardValue2 - fee2);
+    });
+
+    it('Add two extensions and do a transfer', async () => {
+        const testExtension1 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
+        const testExtension2 = Address.parse('EQCgYDKqfTh7zVj9BQwOIPs4SuOhM7wnIjb6bdtM2AJf_Z9G');
+
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actionsList = packActionsList([
+            new ActionAddExtension(testExtension1),
+            new ActionAddExtension(testExtension2),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
+        ]);
+
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body: createBody(actionsList)
+        });
+
+        expect(receipt.transactions.length).toEqual(3);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const fee = receipt.transactions[2].totalFees.coins;
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
+
+        const extensionsDict = Dictionary.loadDirect(
+            Dictionary.Keys.BigUint(256),
+            Dictionary.Values.BigInt(8),
+            await walletV5.getExtensions()
+        );
+
+        expect(extensionsDict.size).toEqual(2);
+
+        expect(extensionsDict.get(packAddress(testExtension1))).toEqual(
+            BigInt(testExtension1.workChain)
+        );
+        expect(extensionsDict.get(packAddress(testExtension2))).toEqual(
+            BigInt(testExtension2.workChain)
+        );
     });
 });
