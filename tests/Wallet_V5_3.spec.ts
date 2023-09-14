@@ -3,8 +3,9 @@ import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from '
 import { Opcodes, WalletV5 } from '../wrappers/WalletV5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
-import { KeyPair, getSecureRandomBytes, keyPairFromSeed, sign } from 'ton-crypto';
-import { bufferToBigInt, packAddress, validUntil } from './utils';
+import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
+import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './utils';
+import { ActionSendMsg, packActionsList } from './actions';
 
 const SUBWALLET_ID = 20230823 + 0;
 
@@ -19,6 +20,7 @@ describe('Wallet_V5_3', () => {
     let walletV5: SandboxContract<WalletV5>;
     let keypair: KeyPair;
     let sender: Sender;
+    let seqno: number;
 
     async function deploy(params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>) {
         blockchain = await Blockchain.create();
@@ -45,6 +47,45 @@ describe('Wallet_V5_3', () => {
         return { deployer, deployResult };
     }
 
+    async function deployOtherWallet(
+        params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>
+    ) {
+        const _keypair = keyPairFromSeed(await getSecureRandomBytes(32));
+
+        const _walletV5 = blockchain.openContract(
+            WalletV5.createFromConfig(
+                {
+                    seqno: params?.seqno ?? 0,
+                    subwallet: params?.subwallet ?? SUBWALLET_ID,
+                    publicKey: params?.publicKey ?? _keypair.publicKey,
+                    extensions: params?.extensions ?? Dictionary.empty()
+                },
+                code
+            )
+        );
+
+        const deployer = await blockchain.treasury('deployer');
+        const _sender = deployer.getSender();
+
+        const deployResult = await _walletV5.sendDeploy(_sender, toNano('0.05'));
+        return { sender: _sender, walletV5: _walletV5, keypair: _keypair, deployer, deployResult };
+    }
+
+    function createBody(actionsList: Cell) {
+        const payload = beginCell()
+            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(validUntil(), 32)
+            .storeUint(seqno, 32) // seqno
+            .storeSlice(actionsList.beginParse())
+            .endCell();
+
+        const signature = sign(payload.hash(), keypair.secretKey);
+        return beginCell()
+            .storeUint(bufferToBigInt(signature), 512)
+            .storeSlice(payload.beginParse())
+            .endCell();
+    }
+
     beforeEach(async () => {
         const { deployer, deployResult } = await deploy();
 
@@ -54,6 +95,8 @@ describe('Wallet_V5_3', () => {
             deploy: true,
             success: true
         });
+
+        seqno = 0;
     });
 
     it('should deploy', async () => {});
@@ -113,7 +156,7 @@ describe('Wallet_V5_3', () => {
 
         const sendTxactionAction = beginCell()
             .storeUint(Opcodes.action_send_msg, 32)
-            .storeUint(SendMode.PAY_GAS_SEPARATELY, 8)
+            .storeInt(SendMode.PAY_GAS_SEPARATELY, 8)
             .storeRef(sendTxMsg)
             .endCell();
 
@@ -127,22 +170,9 @@ describe('Wallet_V5_3', () => {
             )
             .endCell();
 
-        const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
-            .storeUint(validUntil(), 32)
-            .storeUint(0, 32) // seqno
-            .storeSlice(actionsList.beginParse())
-            .endCell();
-
-        const signature = sign(payload.hash(), keypair.secretKey);
-        const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
-            .storeSlice(payload.beginParse())
-            .endCell();
-
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
-            body
+            body: createBody(actionsList)
         });
 
         expect(receipt.transactions.length).toEqual(3);
@@ -173,22 +203,9 @@ describe('Wallet_V5_3', () => {
             .storeSlice(addExtensionAction.beginParse())
             .endCell();
 
-        const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
-            .storeUint(validUntil(), 32)
-            .storeUint(0, 32) // seqno
-            .storeSlice(actionsList.beginParse())
-            .endCell();
-
-        const signature = sign(payload.hash(), keypair.secretKey);
-        const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
-            .storeSlice(payload.beginParse())
-            .endCell();
-
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
-            body
+            body: createBody(actionsList)
         });
 
         expect(receipt.transactions.length).toEqual(2);
@@ -204,5 +221,54 @@ describe('Wallet_V5_3', () => {
 
         const storedWC = extensionsDict.get(packAddress(testExtension));
         expect(storedWC).toEqual(BigInt(testExtension.workChain));
+    });
+
+    it('Send two transfers', async () => {
+        const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue1 = toNano(0.001);
+
+        const { walletV5: testReceiver2Wallet } = await deployOtherWallet();
+
+        const testReceiver2 = testReceiver2Wallet.address;
+        const forwardValue2 = toNano(0.002);
+
+        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver1)).balance;
+        const receiver2BalanceBefore = (await blockchain.getContract(testReceiver2)).balance;
+
+        const msg1 = createMsgInternal({ dest: testReceiver1, value: forwardValue1 });
+        const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue2, bounce: true });
+
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
+        ]);
+
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body: createBody(actionsList)
+        });
+
+        expect(receipt.transactions.length).toEqual(4);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver1,
+            value: forwardValue1
+        });
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver2,
+            value: forwardValue2
+        });
+
+        const fee1 = receipt.transactions[2].totalFees.coins;
+        const fee2 = receipt.transactions[3].totalFees.coins;
+
+        const receiver1BalanceAfter = (await blockchain.getContract(testReceiver1)).balance;
+        const receiver2BalanceAfter = (await blockchain.getContract(testReceiver2)).balance;
+
+        expect(receiver1BalanceAfter).toEqual(receiver1BalanceBefore + forwardValue1 - fee1);
+        expect(receiver2BalanceAfter).toEqual(receiver2BalanceBefore + forwardValue2 - fee2);
     });
 });
