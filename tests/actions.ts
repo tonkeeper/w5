@@ -147,9 +147,9 @@ function packActionsListExtended(actions: (OutAction | ExtendedAction)[]): Cell 
     }
 
     return beginCell()
-        .storeRef(packActionsListExtended(rest))
         .storeUint(1, 1)
         .storeSlice(action.serialize().beginParse())
+        .storeRef(packActionsListExtended(rest))
         .endCell();
 }
 
