@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/WalletV5';
+import { WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
@@ -20,7 +20,7 @@ describe('Wallet V5 extensions auth', () => {
     let code: Cell;
 
     beforeAll(async () => {
-        code = await compile('Wallet_V5_3');
+        code = await compile('wallet_v5');
     });
 
     let blockchain: Blockchain;

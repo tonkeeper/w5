@@ -19,7 +19,7 @@ import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase
 
 const SUBWALLET_ID = 20230823 + 0;
 
-describe('Wallet V5 sign auth internal', () => {
+describe('Wallet V5 sign auth external', () => {
     let code: Cell;
 
     beforeAll(async () => {
