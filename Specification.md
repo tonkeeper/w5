@@ -170,7 +170,7 @@ action_change_library#26fa1dd4 mode:(## 7) { mode <= 2 }
 
 // Extended actions in W5:
 action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;
-action_list_extended$1 {m:#} {n:#} prev:^(ActionList n m) action:ExtendedAction = ActionList n (m+1);
+action_list_extended$1 {m:#} {n:#} action:ExtendedAction prev:^(ActionList n m) = ActionList n (m+1);
 
 action_set_data#1ff8ea0b data:^Cell = ExtendedAction;
 action_add_ext#1c40db9f addr:MsgAddressInt = ExtendedAction;
