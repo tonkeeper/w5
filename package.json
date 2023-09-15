@@ -4,10 +4,7 @@
     "scripts": {
         "start": "blueprint run",
         "build": "blueprint build",
-        "build:w5_1": "blueprint build Wallet_V5_1",
-        "build:w5_2": "blueprint build Wallet_V5_2",
-        "build:w5_3": "blueprint build Wallet_V5_3",
-        "build:w4_2": "blueprint build Wallet_V4_2",
+        "build:v5": "blueprint build wallet_v5",
         "test": "jest"
     },
     "devDependencies": {

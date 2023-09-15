@@ -1,21 +1,30 @@
-import { toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/WalletV5';
+import { Dictionary, toNano } from 'ton-core';
+import { WalletV5 } from '../wrappers/wallet-v5';
 import { compile, NetworkProvider } from '@ton-community/blueprint';
+import { getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
+
+const SUBWALLET_ID = 20230823 + 0;
 
 export async function run(provider: NetworkProvider) {
-    // const walletV5 = provider.open(
-    //     WalletV5.createFromConfig(
-    //         {
-    //             id: Math.floor(Math.random() * 10000),
-    //             counter: 0,
-    //         },
-    //         await compile('WalletV5')
-    //     )
-    // );
+    const keypair = keyPairFromSeed(await getSecureRandomBytes(32));
+    console.log('KEYPAIR PUBKEY', keypair.publicKey.toString('hex'));
+    console.log('KEYPAIR PRIVATE_KEY', keypair.secretKey.toString('hex'));
 
-    // await walletV5.sendDeploy(provider.sender(), toNano('0.05'));
+    const walletV5 = provider.open(
+        WalletV5.createFromConfig(
+            {
+                seqno: 0,
+                subwallet: SUBWALLET_ID,
+                publicKey: keypair.publicKey,
+                extensions: Dictionary.empty()
+            },
+            await compile('wallet_v5')
+        )
+    );
 
-    // await provider.waitForDeploy(walletV5.address);
+    await walletV5.sendDeploy(provider.sender(), toNano('0.05'));
 
-    // console.log('ID', await walletV5.getID());
+    await provider.waitForDeploy(walletV5.address);
+
+    console.log('ADDRESS', walletV5.address);
 }

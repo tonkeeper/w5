@@ -543,7 +543,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(39);
+        ).toEqual(40);
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
@@ -558,7 +558,7 @@ describe('Wallet V5 sign auth internal', () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -604,14 +604,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should fail if signature is invalid: wrong private key used', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -650,14 +650,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should fail if seqno is invalid', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -694,14 +694,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should fail if valid_until is expired', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -738,14 +738,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should fail if subwallet id is wrong', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -782,14 +782,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should skip message if auth kind is wrong', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
@@ -829,7 +829,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receiverBalanceAfter).toEqual(receiver1BalanceBefore);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
     it('Should skip message if auth kind not given', async () => {

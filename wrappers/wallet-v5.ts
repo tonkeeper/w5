@@ -103,6 +103,16 @@ export class WalletV5 implements Contract {
         await provider.internal(via, opts);
     }
 
+    async sendExternalSignedMessage(provider: ContractProvider, body: Cell) {
+        await provider.external(
+            beginCell().storeUint(Opcodes.auth_signed, 32).storeSlice(body.beginParse()).endCell()
+        );
+    }
+
+    async sendExternal(provider: ContractProvider, body: Cell) {
+        await provider.external(body);
+    }
+
     async getPublicKey(provider: ContractProvider) {
         const result = await provider.get('get_public_key', []);
         return result.stack.readBigNumber();

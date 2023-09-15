@@ -37,3 +37,10 @@ export function createMsgInternal(params: {
         init: params.init
     };
 }
+
+export async function disableConsoleError(callback: () => Promise<void>): Promise<void> {
+    const errorsHandler = console.error;
+    console.error = () => {};
+    await callback();
+    console.error = errorsHandler;
+}
