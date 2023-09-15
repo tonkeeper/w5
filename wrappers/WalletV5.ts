@@ -77,6 +77,32 @@ export class WalletV5 implements Contract {
         });
     }
 
+    async sendInternalMessageFromExtension(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            body: Cell;
+        }
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.auth_extension, 32)
+                .storeSlice(opts.body.beginParse())
+                .endCell()
+        });
+    }
+
+    async sendInternal(
+        provider: ContractProvider,
+        via: Sender,
+        opts: Parameters<ContractProvider['internal']>[1]
+    ) {
+        await provider.internal(via, opts);
+    }
+
     async getPublicKey(provider: ContractProvider) {
         const result = await provider.get('get_public_key', []);
         return result.stack.readBigNumber();
@@ -94,6 +120,6 @@ export class WalletV5 implements Contract {
 
     async getExtensions(provider: ContractProvider) {
         const result = await provider.get('get_extensions', []);
-        return result.stack.readCell();
+        return result.stack.readCellOpt();
     }
 }
