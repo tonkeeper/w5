@@ -1,9 +1,7 @@
 import { Dictionary, toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/wallet-v5';
+import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import { compile, NetworkProvider } from '@ton-community/blueprint';
 import { getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
-
-const SUBWALLET_ID = 20230823 + 0;
 
 export async function run(provider: NetworkProvider) {
     const keypair = keyPairFromSeed(await getSecureRandomBytes(32));
@@ -14,7 +12,7 @@ export async function run(provider: NetworkProvider) {
         WalletV5.createFromConfig(
             {
                 seqno: 0,
-                subwallet: SUBWALLET_ID,
+                walletId: new WalletId({ networkGlobalId: -3 }).serialized, // testnet
                 publicKey: keypair.publicKey,
                 extensions: Dictionary.empty()
             },

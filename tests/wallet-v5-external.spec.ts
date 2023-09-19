@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
-import { Opcodes, WalletV5 } from '../wrappers/wallet-v5';
+import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
@@ -23,7 +23,7 @@ import { WalletV4 } from '../wrappers/wallet-v4';
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 
-const SUBWALLET_ID = 20230823 + 0;
+const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: -1, subwalletNumber: 0 });
 
 describe('Wallet V5 sign auth external', () => {
     let code: Cell;
@@ -47,7 +47,7 @@ describe('Wallet V5 sign auth external', () => {
             WalletV5.createFromConfig(
                 {
                     seqno: params?.seqno ?? 0,
-                    subwallet: params?.subwallet ?? SUBWALLET_ID,
+                    walletId: params?.walletId ?? WALLET_ID.serialized,
                     publicKey: params?.publicKey ?? _keypair.publicKey,
                     extensions: params?.extensions ?? Dictionary.empty()
                 },
@@ -64,7 +64,7 @@ describe('Wallet V5 sign auth external', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -86,7 +86,7 @@ describe('Wallet V5 sign auth external', () => {
             WalletV5.createFromConfig(
                 {
                     seqno: 0,
-                    subwallet: SUBWALLET_ID,
+                    walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,
                     extensions: Dictionary.empty()
                 },
@@ -539,14 +539,14 @@ describe('Wallet V5 sign auth external', () => {
         const vu = validUntil();
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(vu, 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
             .endCell();
 
         const fakePayload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(vu, 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -576,7 +576,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -608,7 +608,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -638,7 +638,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(Math.round(Date.now() / 1000) - 600, 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -659,7 +659,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(walletBalanceBefore).toEqual(walletBalanceAfter);
     });
 
-    it('Should fail if subwallet id is wrong', async () => {
+    it('Should fail if walletId id is wrong', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
@@ -668,7 +668,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID + 1, 32)
+            .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -698,7 +698,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID + 1, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())

@@ -1,12 +1,12 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/wallet-v5';
+import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed } from 'ton-crypto';
 import { bufferToBigInt, packAddress } from './utils';
 
-const SUBWALLET_ID = 20230823 + 0;
+const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
 describe('Wallet V5 get methods', () => {
     let code: Cell;
@@ -30,7 +30,7 @@ describe('Wallet V5 get methods', () => {
             WalletV5.createFromConfig(
                 {
                     seqno: params?.seqno ?? 0,
-                    subwallet: params?.subwallet ?? SUBWALLET_ID,
+                    walletId: params?.walletId ?? WALLET_ID.serialized,
                     publicKey: params?.publicKey ?? keypair.publicKey,
                     extensions: params?.extensions ?? Dictionary.empty()
                 },
@@ -68,11 +68,39 @@ describe('Wallet V5 get methods', () => {
         expect(actualPubkey).toEqual(bufferToBigInt(keypair.publicKey));
     });
 
-    it('Get subwallet id', async () => {
-        const expectedSubWalletId = 20230824;
-        await deploy({ subwallet: expectedSubWalletId });
-        const actualSubWalletId = await walletV5.getSubWalletID();
-        expect(expectedSubWalletId).toEqual(actualSubWalletId);
+    it('Get wallet id', async () => {
+        const expectedWalletId = new WalletId({
+            networkGlobalId: -239,
+            workChain: 0,
+            subwalletNumber: 1
+        });
+        await deploy({ walletId: expectedWalletId.serialized });
+        const actualWalletId = await walletV5.getWalletId();
+        expect(expectedWalletId.serialized).toEqual(actualWalletId.serialized);
+    });
+
+    it('Get subwallet number', async () => {
+        const subwalletNumber = 12345;
+        const walletId = new WalletId({
+            networkGlobalId: -239,
+            workChain: 0,
+            subwalletNumber
+        });
+        await deploy({ walletId: walletId.serialized });
+        const actualSubwalletNumber = (await walletV5.getWalletId()).subwalletNumber;
+        expect(subwalletNumber).toEqual(actualSubwalletNumber);
+    });
+
+    it('Default wallet id', async () => {
+        const walletId = new WalletId({
+            networkGlobalId: -239,
+            workChain: 0,
+            subwalletNumber: 0,
+            walletVersion: 'v5'
+        });
+        const defaultWalletId = new WalletId();
+
+        expect(walletId.serialized).toBe(defaultWalletId.serialized);
     });
 
     it('Get extensions dict', async () => {
@@ -93,5 +121,29 @@ describe('Wallet V5 get methods', () => {
             .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
             .endCell();
         expect(actual?.equals(expected)).toBeTruthy();
+    });
+
+    it('Get extensions array', async () => {
+        const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const plugin2 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
+
+        const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
+            Dictionary.Keys.BigUint(256),
+            Dictionary.Values.BigInt(8)
+        );
+        extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
+        extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
+
+        await deploy({ extensions });
+
+        const actual = await walletV5.getExtensionsArray();
+        expect(actual.length).toBe(2);
+        expect(actual[0].equals(plugin1)).toBeTruthy();
+        expect(actual[1].equals(plugin2)).toBeTruthy();
+    });
+
+    it('Get empty extensions array', async () => {
+        const actual = await walletV5.getExtensionsArray();
+        expect(actual.length).toBe(0);
     });
 });

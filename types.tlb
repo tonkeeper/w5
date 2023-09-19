@@ -32,3 +32,7 @@ internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
 external_signed#7369676e signed:SignedRequest = ExternalMsgBody;
 
 actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
+
+// Contract state
+wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:(## 32) = WalletID;
+contract_state$_ seqno:# wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;

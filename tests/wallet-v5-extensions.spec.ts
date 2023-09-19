@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
-import { WalletV5 } from '../wrappers/wallet-v5';
+import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
@@ -14,7 +14,7 @@ import {
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 
-const SUBWALLET_ID = 20230823 + 0;
+const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
 describe('Wallet V5 extensions auth', () => {
     let code: Cell;
@@ -31,7 +31,7 @@ describe('Wallet V5 extensions auth', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(SUBWALLET_ID, 32)
+            .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -53,7 +53,7 @@ describe('Wallet V5 extensions auth', () => {
             WalletV5.createFromConfig(
                 {
                     seqno: 0,
-                    subwallet: SUBWALLET_ID,
+                    walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,
                     extensions: Dictionary.empty()
                 },

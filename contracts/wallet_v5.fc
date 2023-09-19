@@ -42,7 +42,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
           set_data(begin_cell()
             .store_uint(stored_seqno, 32)
-            .store_uint(stored_subwallet, 32)
+            .store_uint(stored_subwallet, 80)
             .store_uint(public_key, 256)
             .store_dict(extensions)
             .end_cell());
@@ -62,7 +62,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure {
   var signature = body~load_bits(512);
   var cs = body;
-  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(32), cs~load_uint(32), cs~load_uint(32));
+  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
 
   throw_if(36, valid_until <= now());
   throw_unless(33, msg_seqno == stored_seqno);
@@ -75,7 +75,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
     .store_uint(stored_seqno, 32)
-    .store_uint(stored_subwallet, 32)
+    .store_uint(stored_subwallet, 80)
     .store_uint(public_key, 256)
     .store_dict(extensions)
     .end_cell());
@@ -87,7 +87,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 () recv_external(slice body) impure {
   var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
+  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
   ds.end_parse();
   int auth_kind = body~load_uint(32);
   if (auth_kind == 0x7369676E) { ;; "sign"
@@ -121,7 +121,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
 
   var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256), ds~load_dict());
+  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
   ds.end_parse();
 
   if (auth_kind == 0x6578746E) { ;; "extn"
@@ -148,18 +148,18 @@ int seqno() method_id {
   return get_data().begin_parse().preload_uint(32);
 }
 
-int get_subwallet_id() method_id {
-  return get_data().begin_parse().skip_bits(32).preload_uint(32);
+int get_wallet_id() method_id {
+  return get_data().begin_parse().skip_bits(32).preload_uint(80);
 }
 
 int get_public_key() method_id {
-  var cs = get_data().begin_parse().skip_bits(64);
+  var cs = get_data().begin_parse().skip_bits(32 + 80);
   return cs.preload_uint(256);
 }
 
 ;; Returns raw dictionary (or null if empty) where keys are packed addresses and the `wc` is stored in leafs.
 ;; User should unpack the address using the same packing function using `wc` to restore the original address.
 cell get_extensions() method_id {
-  var ds = get_data().begin_parse().skip_bits(32 + 32 + 256);
+  var ds = get_data().begin_parse().skip_bits(32 + 80 + 256);
   return ds~load_dict();
 }
