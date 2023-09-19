@@ -54,7 +54,7 @@ export class WalletId {
             )
         );
         const networkGlobalId = bitReader.loadInt(32);
-        const workChain = bitReader.loadUint(8);
+        const workChain = bitReader.loadInt(8);
         const walletVersionRaw = bitReader.loadUint(8);
         const subwalletNumber = bitReader.loadUint(32);
 
