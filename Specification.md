@@ -153,7 +153,7 @@ As of 2023 TON network consists of two workchains: -1 (master) and 0 (base). Thi
 
 Action types:
 
-```tlb
+```tl-b
 // Standard actions from block.tlb:
 out_list_empty$_ = OutList 0;
 out_list$_ {n:#} prev:^(OutList n) action:OutAction
@@ -179,7 +179,7 @@ action_delete_ext#5eaef4a4 addr:MsgAddressInt = ExtendedAction;
 
 Authentication modes:
 
-```tlb
+```tl-b
 signed_request$_ 
   signature:    bits512                   // 512
   subwallet_id: uint32                    // 512+32
@@ -194,6 +194,11 @@ external_signed#7369676E signed:SignedRequest = ExternalMsgBody;
 actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 ```
 
+Contract state:
+```tl-b
+wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:# = WalletID;
+contract_state$_ seqno:# wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
+```
 
 ## Source code
 
