@@ -22,7 +22,7 @@ Thanks to [@subden](https://t.me/subden), [@botpult](https://t.me/botpult) and [
 
 ## Features
 
-* 34% smaller compiled code than in v4R2 (481 vs 734 bytes).
+* 93% smaller compiled code than in v4R2 (50 vs 734 bytes thanks to offloading the code into a shared library on masterchain).
 * Arbitrary amount of outgoing messages is supported via action list.
 * Wallet code can be upgraded transparently without breaking user's address in the future.
 * Wallet code can be extended by anyone in a decentralized and conflict-free way: multiple feature extensions can co-exist.
