@@ -202,4 +202,4 @@ contract_state$_ seqno:# wallet_id:WalletID public_key:(## 256) extensions_dict:
 
 ## Source code
 
-See [contracts/wallet_v5_3.fc](contracts/wallet_v5_3.fc).
+See [contracts/wallet_v5.fc](contracts/wallet_v5.fc).
