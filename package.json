@@ -5,6 +5,9 @@
         "start": "blueprint run",
         "build": "blueprint build",
         "build:v5": "blueprint build wallet_v5",
+        "deploy-library": "npx blueprint run deployLibrary",
+        "deploy-wallet": "blueprint run deployWalletV5",
+        "print-wallet-code": "ts-node ./scripts/printWalletCode.ts",
         "test": "jest"
     },
     "devDependencies": {

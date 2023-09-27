@@ -184,8 +184,13 @@ export class WalletV5 implements Contract {
     }
 
     async getSeqno(provider: ContractProvider) {
-        const result = await provider.get('seqno', []);
-        return result.stack.readNumber();
+        const state = await provider.getState();
+        if (state.state.type === 'active') {
+            let res = await provider.get('seqno', []);
+            return res.stack.readNumber();
+        } else {
+            return 0;
+        }
     }
 
     async getWalletId(provider: ContractProvider) {
