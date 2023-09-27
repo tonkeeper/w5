@@ -10,10 +10,10 @@
   set_data(empty);
 }
 
-() recv_internal(slice in_msg) impure {
+() recv_internal() impure {
   deploy_lib();
 }
 
-() recv_external(slice in_msg) impure {
+() recv_external() impure {
   deploy_lib();
 }
