@@ -24,5 +24,5 @@ export async function run(provider: NetworkProvider) {
 
     await provider.waitForDeploy(walletV5.address);
 
-    console.log('ADDRESS', walletV5.address);
+    console.log('WALLET ADDRESS', walletV5.address);
 }
