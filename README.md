@@ -16,16 +16,16 @@ Wallet V5 has 93% lower storage fees, can delegate payments for gas to third par
 
 ### Build
 
-`npx blueprint build` or `yarn blueprint build`
+`npm run build:v5`
 
 ### Test
 
-`npx blueprint test` or `yarn blueprint test`
+`npm run test`
 
-### Deploy or run another script
+### Deployment
+1. Deploy library: `npm run deploy-library`
+2. Deploy wallet: `npm run deploy-wallet`
 
-`npx blueprint run` or `yarn blueprint run`
+### Get wallet compiled code
 
-### Add a new contract
-
-`npx blueprint create ContractName` or `yarn blueprint create ContractName`
+`npm run print-wallet-code`

@@ -123,6 +123,12 @@ You need to put two requests in your message body:
 
 Yes. We have considered constant-size schemes where the wallet only stores trusted extension code. However, extension authentication becomes combursome and expensive: plugin needs to transmit additional data and each request needs to recompute plugin’s address. We estimate that for the reasonably sized wallets (less than 100 plugins) authentication via the dictionary lookup would not exceed costs of indirect address authentication.
 
+### What is library on masterchain?
+
+Library is a special code storage mechanism that allows to reduce storage cost for a new Wallet V5 contract instance. Wallet V5 contract code is stored into a masterchain library. 
+When wallet contract is being deployed, original code hash is being used as the contract code.
+Library contract itself data and code are empty cells. That leads to the inability to change the library code, delete the contract, or withdraw funds from it.
+Therefore, any Wallet V5 user can top up the library contract balance if they are afraid that the library code of their wallet will be frozen.
 
 ## Wallet ID
 
@@ -131,9 +137,13 @@ Wallet ID disambiguates requests signed with the same public key to different wa
 For Wallet V5 we suggest using the following wallet ID:
 
 ```
-mainnet: 20230823 + workchain
-testnet: 30230823 + workchain
+wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:(## 32) = WalletID;
 ```
+
+- `global_id` is a TON chain identifier. TON Mainnet `global_id = -239` and TON Testnet `global_id = -3`.
+- `wc` is a Workchain. -1 for Masterchain and 0 for Basechain. 
+- `version`: current version of wallet v5 is `0`.
+- `subwallet_number` can be used to get multiplie wallet contracts binded to the single keypair.
 
 ## Packed address
 
