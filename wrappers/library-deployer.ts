@@ -6,13 +6,34 @@ import {
     Contract,
     contractAddress,
     ContractProvider,
+    Dictionary,
+    DictionaryValue,
     Sender,
-    SendMode
+    SendMode,
+    SimpleLibrary
 } from 'ton-core';
+import { SimpleLibraryValue } from 'ton-core/dist/types/SimpleLibrary';
 
 export type LibraryDeployerConfig = {
     libraryCode: Cell;
 };
+
+export function buildBlockchainLibraries(libs: Cell[]): Cell {
+    const libraries = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    libs.forEach(lib => libraries.set(BigInt('0x' + lib.hash().toString('hex')), lib));
+
+    return beginCell().storeDictDirect(libraries).endCell();
+}
+
+export function buildLibraryStateInit(library: SimpleLibrary): Cell {
+    const libraries = Dictionary.empty(
+        Dictionary.Keys.BigUint(256),
+        SimpleLibraryValue as unknown as DictionaryValue<SimpleLibrary>
+    );
+    libraries.set(BigInt('0x' + library.root.hash().toString('hex')), library);
+
+    return beginCell().storeDictDirect(libraries).endCell();
+}
 
 export class LibraryDeployer implements Contract {
     static exportLibCode(code: Cell) {

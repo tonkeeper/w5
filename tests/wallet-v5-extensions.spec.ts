@@ -13,6 +13,7 @@ import {
 } from './actions';
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
+import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -47,6 +48,8 @@ describe('Wallet V5 extensions auth', () => {
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        blockchain.libs = buildBlockchainLibraries([code]);
+
         keypair = keyPairFromSeed(await getSecureRandomBytes(32));
 
         walletV5 = blockchain.openContract(
@@ -57,7 +60,7 @@ describe('Wallet V5 extensions auth', () => {
                     publicKey: keypair.publicKey,
                     extensions: Dictionary.empty()
                 },
-                code
+                LibraryDeployer.exportLibCode(code)
             )
         );
 
@@ -103,6 +106,14 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         const fee = receipt.transactions[2].totalFees.coins;
+        console.debug(
+            'SINGLE INTERNAL TRANSFER FROM EXTENSION GAS USED:',
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).gasUsed
+        );
+
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });

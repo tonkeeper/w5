@@ -5,6 +5,7 @@ import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed } from 'ton-crypto';
 import { bufferToBigInt, packAddress } from './utils';
+import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -22,6 +23,7 @@ describe('Wallet V5 get methods', () => {
 
     async function deploy(params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>) {
         blockchain = await Blockchain.create();
+        blockchain.libs = buildBlockchainLibraries([code]);
         if (!params?.publicKey) {
             keypair = keyPairFromSeed(await getSecureRandomBytes(32));
         }
@@ -34,7 +36,7 @@ describe('Wallet V5 get methods', () => {
                     publicKey: params?.publicKey ?? keypair.publicKey,
                     extensions: params?.extensions ?? Dictionary.empty()
                 },
-                code
+                LibraryDeployer.exportLibCode(code)
             )
         );
 
