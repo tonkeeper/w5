@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
-import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
+import { Address, beginCell, Cell, Dictionary, internal, Sender, SendMode, toNano } from 'ton-core';
 import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
@@ -194,6 +194,34 @@ describe('Wallet V5 sign auth external', () => {
 
         const storedWC = extensionsDict.get(packAddress(testExtension));
         expect(storedWC).toEqual(BigInt(testExtension.workChain));
+    });
+
+    it('Send single transfers to a deployed wallet', async () => {
+        const forwardValue = toNano(0.001);
+
+        const { walletV5: receiver } = await deployOtherWallet();
+
+        const receiverBalanceBefore = (await blockchain.getContract(receiver.address)).balance;
+
+        const msg = internal({ to: receiver.address, value: forwardValue });
+
+        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        expect(receipt.transactions.length).toEqual(2);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: receiver.address,
+            value: forwardValue
+        });
+
+        const fee = receipt.transactions[1].totalFees.coins;
+
+        const receiverBalanceAfter = (await blockchain.getContract(receiver.address)).balance;
+
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 
     it('Send two transfers', async () => {
