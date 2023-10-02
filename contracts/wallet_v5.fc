@@ -1,5 +1,24 @@
 #pragma version =0.4.4;
 
+;; =====================================================================================================================
+;; Original
+;; SINGLE EXTERNAL TRANSFER GAS USED: 3235n
+;; SINGLE INTERNAL TRANSFER GAS USED: 4210n
+;; SINGLE INTERNAL TRANSFER FROM EXT: 2760n
+
+;; =====================================================================================================================
+;; Current results
+;; SINGLE EXTERNAL TRANSFER GAS USED: 3185n
+;; SINGLE INTERNAL TRANSFER GAS USED: 4014n
+;; SINGLE INTERNAL TRANSFER FROM EXT: 2744n
+
+;; =====================================================================================================================
+;; Current savings
+;; SINGLE EXTERNAL TRANSFER GAS USED: 50   1.54%
+;; SINGLE INTERNAL TRANSFER GAS USED: 196  4.65%
+;; SINGLE INTERNAL TRANSFER FROM EXT: 16   0.57%  <<  wut?? it even decreased?! i expected it to increase slightly...
+;;                             TOTAL: 262
+
 #include "imports/stdlib.fc";
 
 ;; Extensible wallet contract v5
@@ -13,44 +32,53 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions(cell action_list) impure asm "c5 POP";
 
 ;; Dispatches already authenticated request.
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure inline {
+() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
+  var extensions = null(); ;; initialize with null, it will be replaced with dict if needed to be used
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
-      int op = cs~load_uint(32);
+    int op = cs~load_uint(32);
 
-      ;; Raw set_data
-      if (op == 0x1ff8ea0b) {
-          set_data(cs~load_ref());
+    ;; Raw set_data
+    if (op == 0x1ff8ea0b) {
+      set_data(cs~load_ref());
+    }
+
+    ;; Add/remove extensions
+    if ((op == 0x1c40db9f) | (op == 0x5eaef4a4)) {
+      (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
+      int packed_addr = pack_address(wc, hash);
+
+      ifnot (immutable_tail.slice_empty?()) {
+        immutable_tail = immutable_tail.skip_bits(80 + 256);
+        extensions = immutable_tail~load_dict();
+        ;; ds.end_parse() guarantees that there is no more data in immutable_tail
       }
 
-      ;; Add/remove extensions
-      if ((op == 0x1c40db9f) | (op == 0x5eaef4a4)) {
-          (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
-          int packed_addr = pack_address(wc, hash);
-
-          ;; Add extension
-          if (op == 0x1c40db9f) {
-              (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
-              throw_unless(39, success?);
-          }
-          ;; Remove extension
-          if (op == 0x5eaef4a4) {
-              (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
-              throw_unless(40, success?);
-          }
-
-          set_data(begin_cell()
-            .store_uint(stored_seqno, 32)
-            .store_uint(stored_subwallet, 80)
-            .store_uint(public_key, 256)
-            .store_dict(extensions)
-            .end_cell());
+      ;; Add extension
+      if (op == 0x1c40db9f) {
+        (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
+        throw_unless(39, success?);
+      }
+      ;; Remove extension
+      if (op == 0x5eaef4a4) {
+        (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
+        throw_unless(40, success?);
       }
 
-      ;; Other actions are no-op
-      ;; FIXME: is it costlier to check for unsupported actions and throw?
-      cs = cs~load_ref().begin_parse();
+      ;; couldn't use immutable_tail even if wanted to
+      ;; TODO: consider moving dict (presence bit) to left (defragment mutable data)
+      set_data(begin_cell()
+              .store_uint(stored_seqno, 32)
+              .store_uint(stored_subwallet, 80)
+              .store_uint(public_key, 256)
+              .store_dict(extensions)
+              .end_cell());
+    }
+
+    ;; Other actions are no-op
+    ;; FIXME: is it costlier to check for unsupported actions and throw?
+    cs = cs~load_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions:
@@ -59,7 +87,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure inline {
+() process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
   var signature = body~load_bits(512);
   var cs = body;
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
@@ -74,24 +102,27 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
-    .store_uint(stored_seqno, 32)
-    .store_uint(stored_subwallet, 80)
-    .store_uint(public_key, 256)
-    .store_dict(extensions)
-    .end_cell());
+          .store_uint(stored_seqno, 32)
+          .store_slice(immutable_tail)
+          ;;  .store_uint(stored_subwallet, 80)
+          ;;  .store_uint(public_key, 256)
+          ;;  .store_dict(extensions)
+          .end_cell());
 
   commit();
 
-  dispatch_request(cs, stored_seqno, stored_subwallet, public_key, extensions);
+  dispatch_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
 () recv_external(slice body) impure {
   var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
   int auth_kind = body~load_uint(32);
   if (auth_kind == 0x7369676E) { ;; "sign"
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+    process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
   } else {
     ;; FIXME: probably need to throw here?
     return ();
@@ -121,23 +152,26 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
 
   var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
 
   if (auth_kind == 0x6578746E) { ;; "extn"
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
+    var extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
     var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
     if ~(success?) {
       ;; Note that some random contract may have deposited funds with this prefix,
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+    dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
   }
   if (auth_kind == 0x7369676E) { ;; "sign"
     ;; Process the rest of the slice just like the signed request.
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+    process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
   }
 }
 
