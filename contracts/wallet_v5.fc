@@ -8,6 +8,7 @@
 ;;     Unrolled the common internal handler code               3185 3700 2373  9258 |  992 (9.68%) << hey, almost 1000!
 ;;     Implicitly return from the external handler             3165 3700 2373  9238 | 1012 (9.87%) << 1000 gas get!
 ;;     Reaped benefits of separated internal loaders           3165 3700 2295  9160 | 1090 (10.6%) << 10% get!
+;;     Discarded unneccessary slice remains in dispatcher      3155 3690 2285  9130 | 1120 (10.9%)
 
 #include "imports/stdlib.fc";
 
@@ -67,11 +68,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
     ;; Other actions are no-op
     ;; FIXME: is it costlier to check for unsupported actions and throw?
-    cs = cs~load_ref().begin_parse();
+    cs = cs.preload_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs~load_ref());
+  set_actions(cs.preload_ref());
   return ();
 }
 
