@@ -5,6 +5,7 @@
 ;;     INITIAL                                                 3235 4210 2760 10250 |    0 (0.00%)
 ;;     Optimized unneccessary cell loads and operations        3185 4014 2744  9943 |  262 (2.56%)
 ;;     Removed unneccessary always true check                  3185 3823 2501  9509 |  741 (7.23%)
+;;     Unrolled the common internal handler code               3185 3700 2373  9258 |  992 (9.68%) << hey, almost 1000!
 
 #include "imports/stdlib.fc";
 
@@ -132,18 +133,17 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
-  if (auth_kind != 0x6578746E) & (auth_kind != 0x7369676E) { ;; "extn" & "sign"
-    ;; ignore all unauthenticated messages
-    return ();
-  }
 
-  var ds = get_data().begin_parse();
-  var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
+  ;; Since the space is not of concern... duplicating common code down into branches saves some gas!
 
   if (auth_kind == 0x6578746E) { ;; "extn"
+
+    var ds = get_data().begin_parse();
+    var stored_seqno = ds~load_uint(32);
+    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+    ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
+
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
     var extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
@@ -156,11 +156,19 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return ();
   }
-  ;; It CANNOT be anything else! See check above ("extn" & "sign"). Saves considerable amount of gas!
-  ;; if (auth_kind == 0x7369676E) { ;; "sign"
+
+  if (auth_kind == 0x7369676E) { ;; "sign"
+
+    var ds = get_data().begin_parse();
+    var stored_seqno = ds~load_uint(32);
+    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+    ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
+
     ;; Process the rest of the slice just like the signed request.
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
-  ;; }
+    return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
+  }
 }
 
 
