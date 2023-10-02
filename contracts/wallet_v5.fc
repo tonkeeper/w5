@@ -1,23 +1,10 @@
 #pragma version =0.4.4;
 
 ;; =====================================================================================================================
-;; Original
-;; SINGLE EXTERNAL TRANSFER GAS USED: 3235n
-;; SINGLE INTERNAL TRANSFER GAS USED: 4210n
-;; SINGLE INTERNAL TRANSFER FROM EXT: 2760n
-
-;; =====================================================================================================================
-;; Current results
-;; SINGLE EXTERNAL TRANSFER GAS USED: 3185n
-;; SINGLE INTERNAL TRANSFER GAS USED: 4014n
-;; SINGLE INTERNAL TRANSFER FROM EXT: 2744n
-
-;; =====================================================================================================================
-;; Current savings
-;; SINGLE EXTERNAL TRANSFER GAS USED: 50   1.54%
-;; SINGLE INTERNAL TRANSFER GAS USED: 196  4.65%
-;; SINGLE INTERNAL TRANSFER FROM EXT: 16   0.57%  <<  wut?? it even decreased?! i expected it to increase slightly...
-;;                             TOTAL: 262
+;; Improvements log:                                           EXT  INT  EXTN TOTAL | SAVE (PERC%)
+;;     INITIAL                                                 3235 4210 2760 10250 |    0 (0.00%)
+;;     Optimized unneccessary cell loads and operations        3185 4014 2744  9943 |  262 (2.56%)
+;;     Removed unneccessary always true check                  3185 3823 2501  9509 |  741 (7.23%)
 
 #include "imports/stdlib.fc";
 
@@ -67,7 +54,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       }
 
       ;; couldn't use immutable_tail even if wanted to
-      ;; TODO: consider moving dict (presence bit) to left (defragment mutable data)
       set_data(begin_cell()
               .store_uint(stored_seqno, 32)
               .store_uint(stored_subwallet, 80)
@@ -168,11 +154,13 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       return ();
     }
     dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    return ();
   }
-  if (auth_kind == 0x7369676E) { ;; "sign"
+  ;; It CANNOT be anything else! See check above ("extn" & "sign"). Saves considerable amount of gas!
+  ;; if (auth_kind == 0x7369676E) { ;; "sign"
     ;; Process the rest of the slice just like the signed request.
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
-  }
+  ;; }
 }
 
 
