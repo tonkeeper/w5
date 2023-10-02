@@ -6,6 +6,7 @@
 ;;     Optimized unneccessary cell loads and operations        3185 4014 2744  9943 |  262 (2.56%)
 ;;     Removed unneccessary always true check                  3185 3823 2501  9509 |  741 (7.23%)
 ;;     Unrolled the common internal handler code               3185 3700 2373  9258 |  992 (9.68%) << hey, almost 1000!
+;;     Implicitly return from the external handler             3165 3700 2373  9238 | 1012 (9.87%) << 1000 gas get!
 
 #include "imports/stdlib.fc";
 
@@ -110,6 +111,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   int auth_kind = body~load_uint(32);
   if (auth_kind == 0x7369676E) { ;; "sign"
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    return();
   } else {
     ;; FIXME: probably need to throw here?
     return ();
