@@ -10,6 +10,7 @@
 ;;     Reaped benefits of separated internal loaders           3165 3700 2295  9160 | 1090 (10.6%) << 10% get!
 ;;     Discarded unneccessary slice remains in dispatcher      3155 3690 2285  9130 | 1120 (10.9%)
 ;;     Loaded auth_kind optionally using LDUQ instruction      3155 3654 2249  9058 | 1192 (11.6%) << black magic begins
+;;     Is ifnot a joke for you? (emits less instructions)      3155 3654 2231  9040 | 1210 (11.8%)
 
 #include "imports/stdlib.fc";
 
@@ -154,7 +155,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
     var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
-    if ~(success?) {
+    ifnot (success?) {
       ;; Note that some random contract may have deposited funds with this prefix,
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
