@@ -14,6 +14,7 @@
 ;;     Localize extensions in loop and short-circ simple       3045 3644 2121  8810 | 1440 (14.0%)
 ;;     Reordering int msg handlers somehow saves 10 gas        3045 3567 2188  8800 | 1450 (14.1%) << but... why?
 ;;     Moving signature check higher saves some gas            3027 3549 2188  8764 | 1486 (14.5%)
+;;     Reordering checks somehow sames some more gas           3009 3531 2188  8728 | 1522 (14.8%)
 
 #include "imports/stdlib.fc";
 
@@ -97,9 +98,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var cs = body;
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
 
-  throw_if(36, valid_until <= now());
-  throw_unless(33, msg_seqno == stored_seqno);
   throw_unless(34, subwallet_id == stored_subwallet);
+  throw_unless(33, msg_seqno == stored_seqno);
+  throw_if(36, valid_until <= now());
 
   accept_message();
 
