@@ -11,6 +11,7 @@
 ;;     Discarded unneccessary slice remains in dispatcher      3155 3690 2285  9130 | 1120 (10.9%)
 ;;     Loaded auth_kind optionally using LDUQ instruction      3155 3654 2249  9058 | 1192 (11.6%) << black magic begins
 ;;     Is ifnot a joke for you? (emits less instructions)      3155 3654 2231  9040 | 1210 (11.8%)
+;;     Localize extensions in loop and short-circ simple       3045 3644 2121  8810 | 1440 (14.0%)
 
 #include "imports/stdlib.fc";
 
@@ -29,8 +30,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Dispatches already authenticated request.
 () dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
-  var extensions = null(); ;; initialize with null, it will be replaced with dict if needed to be used
-
+  ifnot (cs.preload_uint(1)) {
+    set_actions(cs.preload_ref());
+    return ();
+  }
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
     int op = cs~load_uint(32);
@@ -45,11 +48,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
       int packed_addr = pack_address(wc, hash);
 
-      ifnot (immutable_tail.slice_empty?()) {
-        immutable_tail = immutable_tail.skip_bits(80 + 256);
-        extensions = immutable_tail~load_dict();
-        ;; ds.end_parse() guarantees that there is no more data in immutable_tail
-      }
+      var extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
 
       ;; Add extension
       if (op == 0x1c40db9f) {
@@ -62,12 +61,19 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
         throw_unless(40, success?);
       }
 
-      ;; couldn't use immutable_tail even if wanted to
+      immutable_tail = begin_cell()
+                       .store_uint(stored_subwallet, 80)
+                       .store_uint(public_key, 256)
+                       .store_dict(extensions)
+                       .end_cell()
+                       .begin_parse();
+
       set_data(begin_cell()
               .store_uint(stored_seqno, 32)
-              .store_uint(stored_subwallet, 80)
-              .store_uint(public_key, 256)
-              .store_dict(extensions)
+              .store_slice(immutable_tail)
+              ;; .store_uint(stored_subwallet, 80)
+              ;; .store_uint(public_key, 256)
+              ;; .store_dict(extensions)
               .end_cell());
     }
 
