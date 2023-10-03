@@ -16,7 +16,7 @@
 ;;     Moving signature check higher saves some gas            3027 3549 2188  8764 | 1486 (14.5%)
 ;;     Reordering checks somehow sames some more gas           3009 3531 2188  8728 | 1522 (14.8%)
 ;;     Removing end_parse is -gas and +reliability             2983 3505 2188  8676 | 1574 (15.6%) << TODO: is it allowed?
-
+;;     Keep your functions close and vars even closer          2957 3505 2188  8650 | 1600 (15.6%) << real %, not rounded
 
 ;; N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
 
@@ -124,19 +124,16 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () recv_external(slice body) impure {
-  var ds = get_data().begin_parse();
-  var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  ;; TODO: Confirm this can be done
-  ;; ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
   int auth_kind = body~load_uint(32);
   if (auth_kind == 0x7369676E) { ;; "sign"
+    var ds = get_data().begin_parse();
+    var stored_seqno = ds~load_uint(32);
+    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+    ;; TODO: Confirm this can be done
+    ;; ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return();
-  } else {
-    ;; FIXME: probably need to throw here?
-    return ();
   }
 }
 
