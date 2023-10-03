@@ -15,6 +15,10 @@
 ;;     Reordering int msg handlers somehow saves 10 gas        3045 3567 2188  8800 | 1450 (14.1%) << but... why?
 ;;     Moving signature check higher saves some gas            3027 3549 2188  8764 | 1486 (14.5%)
 ;;     Reordering checks somehow sames some more gas           3009 3531 2188  8728 | 1522 (14.8%)
+;;     Removing end_parse is -gas and +reliability             2983 3505 2188  8676 | 1574 (15.6%) << TODO: is it allowed?
+
+
+;; N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
 
 #include "imports/stdlib.fc";
 
@@ -124,7 +128,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
   var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
+  ;; TODO: Confirm this can be done
+  ;; ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
   int auth_kind = body~load_uint(32);
   if (auth_kind == 0x7369676E) { ;; "sign"
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
@@ -160,7 +165,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var stored_seqno = ds~load_uint(32);
     var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
     var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-    ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
+    ;; TODO: Confirm this can be done
+    ;; ds.skip_dict().end_parse(); ;; do not load extensions right away, mostly they will not be needed
 
     ;; Process the rest of the slice just like the signed request.
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
@@ -174,7 +180,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var stored_seqno = ds~load_uint(32);
     var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
     var (stored_subwallet, public_key, extensions) = (ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-    ds.end_parse(); ;; here we actually need the extensions 100%
+    ;; TODO: Confirm this can be done
+    ;; ds.end_parse(); ;; here we actually need the extensions 100%
 
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
