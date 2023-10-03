@@ -9,8 +9,12 @@
 ;;     Implicitly return from the external handler             3165 3700 2373  9238 | 1012 (9.87%) << 1000 gas get!
 ;;     Reaped benefits of separated internal loaders           3165 3700 2295  9160 | 1090 (10.6%) << 10% get!
 ;;     Discarded unneccessary slice remains in dispatcher      3155 3690 2285  9130 | 1120 (10.9%)
+;;     Loaded auth_kind optionally using LDUQ instruction      3155 3654 2249  9058 | 1192 (11.6%) << black magic begins
 
 #include "imports/stdlib.fc";
+
+;; LDUQ: s - x s' -1 or s 0 --NULLROTRIFNOT--> s - x s' -1 or # s 0
+(int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
 
 ;; Extensible wallet contract v5
 
@@ -120,7 +124,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
 }
 
-
 () recv_internal(int msg_value, cell full_msg, slice body) impure {
   var full_msg_slice = full_msg.begin_parse();
   var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
@@ -128,11 +131,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; ignore all bounced messages
     return ();
   }
-  if (body.slice_bits() < 32) {
+  (int auth_kind, body, int success) = body.try_load_uint32(); ;; why there is no such stuff built in compiler?
+  ifnot (success) {
     ;; ignore simple transfers
     return ();
   }
-  int auth_kind = body~load_uint(32);
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
