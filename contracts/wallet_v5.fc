@@ -12,6 +12,7 @@
 ;;     Loaded auth_kind optionally using LDUQ instruction      3155 3654 2249  9058 | 1192 (11.6%) << black magic begins
 ;;     Is ifnot a joke for you? (emits less instructions)      3155 3654 2231  9040 | 1210 (11.8%)
 ;;     Localize extensions in loop and short-circ simple       3045 3644 2121  8810 | 1440 (14.0%)
+;;     Reordering int msg handlers somehow saves 10 gas        3045 3567 2188  8800 | 1450 (14.1%) << but... why?
 
 #include "imports/stdlib.fc";
 
@@ -150,26 +151,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   ;; Since the space is not of concern... duplicating common code down into branches saves some gas!
 
-  if (auth_kind == 0x6578746E) { ;; "extn"
-
-    var ds = get_data().begin_parse();
-    var stored_seqno = ds~load_uint(32);
-    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-    var (stored_subwallet, public_key, extensions) = (ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-    ds.end_parse(); ;; here we actually need the extensions 100%
-
-    ;; Authenticate extension by its address.
-    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
-    var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
-    ifnot (success?) {
-      ;; Note that some random contract may have deposited funds with this prefix,
-      ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-      return ();
-    }
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
-    return ();
-  }
-
   if (auth_kind == 0x7369676E) { ;; "sign"
 
     var ds = get_data().begin_parse();
@@ -181,6 +162,27 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; Process the rest of the slice just like the signed request.
     process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
+
+  }
+
+  if (auth_kind == 0x6578746E) { ;; "extn"
+
+    var ds = get_data().begin_parse();
+    var stored_seqno = ds~load_uint(32);
+    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    var (stored_subwallet, public_key, extensions) = (ds~load_uint(80), ds~load_uint(256), ds~load_dict());
+    ds.end_parse(); ;; here we actually need the extensions 100%
+
+    ;; Authenticate extension by its address.
+    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
+    var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
+    ifnot (success?) {
+      ;; Note that some random contract may have deposited funds with this prefix,
+      ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
+      return ();
+    }
+    dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    return ();
   }
 }
 
