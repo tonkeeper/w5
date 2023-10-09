@@ -33,10 +33,12 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
       int packed_addr = pack_address(wc, hash);
 
-      ifnot (immutable_tail.slice_empty?()) {
-        immutable_tail = immutable_tail.skip_bits(80 + 256);
-        extensions = immutable_tail~load_dict();
-        ;; ds.end_parse() guarantees that there is no more data in immutable_tail
+      ifnot (immutable_tail.null?()) {
+        ;; immutable_tail = immutable_tail.skip_bits(80 + 256);
+        extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
+        ;; ds.end_parse() NO MORE guarantees that there is no more data in immutable_tail
+        ;; immutable_tail~skip_bits(immutable_tail.slice_bits()); ;; more resiliency in case of extraneous data
+        immutable_tail = null();
       }
 
       ;; Add extension
