@@ -52,7 +52,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
       set_data(begin_cell()
               .store_uint(stored_seqno, 32)
-              .store_slice(immutable_tail)
               .store_uint(stored_subwallet, 80)
               .store_uint(public_key, 256)
               .store_dict(extensions)
@@ -81,6 +80,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
+;; WTF?! Merging this function into dispatch_ext_request INCREASES gas usage by 18!
 () dispatch_ext_request_complex_wrap(slice cs, slice ds, cell extensions) impure inline {
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
@@ -170,6 +170,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
 
   if (auth_kind == 0x6578746E) { ;; "extn"
+
+    ;; WTF?! Splitting this function into separate inline function noticeably INCREASES gas usage!
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
