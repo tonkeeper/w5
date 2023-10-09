@@ -80,20 +80,16 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
-;; WTF?! Merging this function into dispatch_ext_request INCREASES gas usage by 18!
-() dispatch_ext_request_complex_wrap(slice cs, slice ds, cell extensions) impure inline {
-  var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
-}
-
-() dispatch_ext_request(slice cs, slice ds, cell extensions) impure inline {
+() dispatch_ext_request(slice cs) impure inline {
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
-  dispatch_ext_request_complex_wrap(cs, ds, extensions);
+  var ds = get_data().begin_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -188,7 +184,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
-    dispatch_ext_request(body, ds, extensions); ;; Special route for external address authenticated request
+    dispatch_ext_request(body); ;; Special route for external address authenticated request
     ;; dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return ();
   }
