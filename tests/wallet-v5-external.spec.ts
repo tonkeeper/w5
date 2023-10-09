@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract } from '@ton-community/sandbox';
+import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, internal, Sender, SendMode, toNano } from 'ton-core';
 import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
@@ -38,6 +38,17 @@ describe('Wallet V5 sign auth external', () => {
     let keypair: KeyPair;
     let sender: Sender;
     let seqno: number;
+
+    let ggc: bigint = BigInt(0);
+    function accountForGas(transactions: BlockchainTransaction[]) {
+        transactions.forEach((tx) => {
+            ggc += ((tx?.description as TransactionDescriptionGeneric)?.computePhase as TransactionComputeVm)?.gasUsed ?? BigInt(0);
+        })
+    }
+
+    afterAll(async() => {
+        console.log("EXTERNAL TESTS: Total gas " + ggc);
+    });
 
     async function deployOtherWallet(
         params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>
@@ -145,6 +156,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
 
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
@@ -182,6 +194,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(1);
+        accountForGas(receipt.transactions);
 
         const extensions = await walletV5.getExtensions();
         const extensionsDict = Dictionary.loadDirect(
@@ -210,6 +223,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
 
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
@@ -247,6 +261,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(3);
+        accountForGas(receipt.transactions);
 
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
@@ -290,6 +305,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
 
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
@@ -308,6 +324,7 @@ describe('Wallet V5 sign auth external', () => {
         );
 
         expect(extensionsDict.size).toEqual(2);
+        accountForGas(receipt.transactions);
 
         expect(extensionsDict.get(packAddress(testExtension1))).toEqual(
             BigInt(testExtension1.workChain)
@@ -339,6 +356,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(3);
+        accountForGas(receipt.transactions);
 
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
@@ -390,6 +408,7 @@ describe('Wallet V5 sign auth external', () => {
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         expect(receipt.transactions.length).toEqual(range.length + 1);
+        accountForGas(receipt.transactions);
 
         receivers.forEach((to, i) => {
             expect(receipt.transactions).toHaveTransaction({
@@ -417,7 +436,7 @@ describe('Wallet V5 sign auth external', () => {
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList1 = packActionsList([new ActionAddExtension(testExtension)]);
-        await walletV5.sendExternalSignedMessage(createBody(actionsList1));
+        const receipt1 = await walletV5.sendExternalSignedMessage(createBody(actionsList1));
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -429,7 +448,7 @@ describe('Wallet V5 sign auth external', () => {
         );
 
         const actionsList2 = packActionsList([new ActionRemoveExtension(testExtension)]);
-        await walletV5.sendExternalSignedMessage(createBody(actionsList2));
+        const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
         const extensionsDict2 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -438,6 +457,9 @@ describe('Wallet V5 sign auth external', () => {
 
         expect(extensionsDict2.size).toEqual(0);
         expect(extensionsDict2.get(packAddress(testExtension))).toEqual(undefined);
+
+        accountForGas(receipt1.transactions);
+        accountForGas(receipt2.transactions);
     });
 
     it('Change code and data to wallet v4', async () => {
@@ -453,7 +475,8 @@ describe('Wallet V5 sign auth external', () => {
             new ActionSetData(data_v4),
             new ActionSetCode(code_v4)
         ]);
-        await walletV5.sendExternalSignedMessage(createBody(actionsList));
+        const receipt1 = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+        accountForGas(receipt1.transactions);
 
         const walletV4 = blockchain.openContract(WalletV4.createFromAddress(walletV5.address));
         const seqno = await walletV4.getSeqno();
@@ -512,7 +535,8 @@ describe('Wallet V5 sign auth external', () => {
         const testExtension = Address.parseRaw('0:' + '0'.repeat(64));
 
         const actionsList1 = packActionsList([new ActionAddExtension(testExtension)]);
-        await walletV5.sendExternalSignedMessage(createBody(actionsList1));
+        const receipt1 = await walletV5.sendExternalSignedMessage(createBody(actionsList1));
+        accountForGas(receipt1.transactions);
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),

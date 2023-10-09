@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract } from '@ton-community/sandbox';
+import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
 import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
@@ -29,6 +29,17 @@ describe('Wallet V5 extensions auth', () => {
     let keypair: KeyPair;
     let sender: Sender;
     let seqno: number;
+
+    let ggc: bigint = BigInt(0);
+    function accountForGas(transactions: BlockchainTransaction[]) {
+        transactions.forEach((tx) => {
+            ggc += ((tx?.description as TransactionDescriptionGeneric)?.computePhase as TransactionComputeVm)?.gasUsed ?? BigInt(0);
+        })
+    }
+
+    afterAll(async() => {
+        console.log("EXTENSIONS TESTS: Total gas " + ggc);
+    });
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
@@ -99,6 +110,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(3);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
             to: testReceiver,
@@ -152,6 +165,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(4);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
             to: testReceiver1,
@@ -202,6 +217,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt1.transactions.length).toEqual(2);
+        accountForGas(receipt1.transactions);
+
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -222,6 +239,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt2.transactions.length).toEqual(2);
+        accountForGas(receipt2.transactions);
+
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -247,6 +266,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -271,6 +292,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
             to: testReceiver,
