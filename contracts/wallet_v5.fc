@@ -16,7 +16,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions(cell action_list) impure asm "c5 POP";
 
 ;; Dispatches already authenticated request.
-() dispatch_complex_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline_ref {
+() dispatch_complex_request_inline(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
   var extensions = null();
 
   ;; Recurse into extended actions until we reach standard actions
@@ -69,6 +69,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return ();
 }
 
+() dispatch_complex_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline_ref {
+  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+}
+
 () dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
@@ -77,15 +81,19 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
+() dispatch_ext_request_complex_wrap(slice cs, slice ds, cell extensions) impure inline {
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+}
+
 () dispatch_ext_request(slice cs, slice ds, cell extensions) impure inline {
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
-  var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+  dispatch_ext_request_complex_wrap(cs, ds, extensions);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -164,6 +172,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   if (auth_kind == 0x6578746E) { ;; "extn"
 
     var ds = get_data().begin_parse();
+    ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
     ;; var stored_seqno = ds~load_uint(32);
     ;; var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
     ;; var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
@@ -177,7 +186,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
-    dispatch_ext_request(body, ds, extensions);
+    dispatch_ext_request(body, ds, extensions); ;; Special route for external address authenticated request
     ;; dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return ();
   }
