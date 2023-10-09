@@ -16,11 +16,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions(cell action_list) impure asm "c5 POP";
 
 ;; Dispatches already authenticated request.
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
-  ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref());
-    return ();
-  }
+() dispatch_complex_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline_ref {
+  var extensions = null();
+
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
     int op = cs~load_uint(32);
@@ -35,7 +33,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
       int packed_addr = pack_address(wc, hash);
 
-      var extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
+      ifnot (immutable_tail.slice_empty?()) {
+        immutable_tail = immutable_tail.skip_bits(80 + 256);
+        extensions = immutable_tail~load_dict();
+        ;; ds.end_parse() guarantees that there is no more data in immutable_tail
+      }
 
       ;; Add extension
       if (op == 0x1c40db9f) {
@@ -48,19 +50,12 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
         throw_unless(40, success?);
       }
 
-      immutable_tail = begin_cell()
-                       .store_uint(stored_subwallet, 80)
-                       .store_uint(public_key, 256)
-                       .store_dict(extensions)
-                       .end_cell()
-                       .begin_parse();
-
       set_data(begin_cell()
               .store_uint(stored_seqno, 32)
               .store_slice(immutable_tail)
-              ;; .store_uint(stored_subwallet, 80)
-              ;; .store_uint(public_key, 256)
-              ;; .store_dict(extensions)
+              .store_uint(stored_subwallet, 80)
+              .store_uint(public_key, 256)
+              .store_dict(extensions)
               .end_cell());
     }
 
@@ -72,6 +67,25 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Simply set the C5 register with all pre-computed actions:
   set_actions(cs.preload_ref());
   return ();
+}
+
+() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
+  ifnot (cs.preload_uint(1)) {
+    set_actions(cs.preload_ref());
+    return ();
+  }
+  dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+}
+
+() dispatch_ext_request(slice cs, slice ds, cell extensions) impure inline {
+  ifnot (cs.preload_uint(1)) {
+    set_actions(cs.preload_ref());
+    return ();
+  }
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -150,9 +164,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   if (auth_kind == 0x6578746E) { ;; "extn"
 
     var ds = get_data().begin_parse();
-    var stored_seqno = ds~load_uint(32);
-    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-    var (stored_subwallet, public_key, extensions) = (ds~load_uint(80), ds~load_uint(256), ds~load_dict());
+    ;; var stored_seqno = ds~load_uint(32);
+    ;; var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    ;; var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+    var extensions = ds.skip_bits(32 + 80 + 256).preload_dict();
 
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
@@ -162,7 +177,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    dispatch_ext_request(body, ds, extensions);
+    ;; dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
     return ();
   }
 }

@@ -15,5 +15,11 @@ Moving signature check higher saves some gas            3027 3549 2188  8764 | 1
 Reordering checks somehow sames some more gas           3009 3531 2188  8728 | 1522 (14.8%) | 69265 70299 39716 179280
 Removing end_parse is -gas and +reliability             2983 3505 2188  8676 | 1574 (15.6%) | 68953 70065 39716 178734
 Keep your functions close and vars even closer          2957 3505 2188  8650 | 1600 (15.6%) | 68641 70065 39716 178422
+< restore extensions var in loop >                      3067 3533 2288  8888                  65669 67568 38456
+< move complex logic to inline_ref >                    2957 3423 2316  8696                  65528 67495 39148
+< optimize tail loading of extensions >                 2957 3423 2298  8678                  65528 67495 39040
+< optimize preference for simple ext ops >              2957 3423 2248  8628                  65528 67495 39324
+Refactored internal message flows, good GGC value       2957 3423 2248  8628 | 1622 (15.8%) | 65528 67495 39324 172347
+^^^ This commit finally shows TOTAL GGC less then initial one WHILE providing 15.8% gas save on contest test cases! ^^^
 
 N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
