@@ -16,7 +16,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions(cell action_list) impure asm "c5 POP";
 
 ;; Dispatches already authenticated request.
-() dispatch_complex_request_inline(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
+() dispatch_complex_request_inline(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   var extensions = null();
 
   ;; Recurse into extended actions until we reach standard actions
@@ -68,16 +68,16 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return ();
 }
 
-() dispatch_complex_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline_ref {
-  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+() dispatch_complex_request(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
+  dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
+() dispatch_request(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
-  dispatch_complex_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+  dispatch_complex_request(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_ext_request(slice cs) impure inline {
@@ -89,11 +89,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
   var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-  dispatch_complex_request_inline(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+  dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, slice immutable_tail) impure inline {
+() process_signed_request(slice body, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   var signature = body~load_bits(512);
   throw_unless(35, check_signature(slice_hash(body), signature, public_key));
 
@@ -118,7 +118,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  dispatch_request(cs, stored_seqno, stored_subwallet, public_key, immutable_tail);
+  dispatch_request(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
 () recv_external(slice body) impure {
@@ -128,7 +128,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var stored_seqno = ds~load_uint(32);
     var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
     var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return();
   }
 }
@@ -160,7 +160,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
 
     ;; Process the rest of the slice just like the signed request.
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
   }
@@ -185,7 +185,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       return ();
     }
     dispatch_ext_request(body); ;; Special route for external address authenticated request
-    ;; dispatch_request(body, stored_seqno, stored_subwallet, public_key, immutable_tail);
+    ;; dispatch_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return ();
   }
 }
