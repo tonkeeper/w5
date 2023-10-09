@@ -11,6 +11,7 @@ Wallet V5 has 93% lower storage fees, can delegate payments for gas to third par
 -   `wrappers` - wrapper classes (implementing `Contract` from ton-core) for the contracts, including any [de]serialization primitives and compilation functions.
 -   `tests` - tests for the contracts.
 -   `scripts` - scripts used by the project, mainly the deployment scripts.
+-   **[Gas improvements](Improvements.rst)** (detailed by contest paths, global gas counters per commit)
 
 ## How to use
 
