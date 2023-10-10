@@ -159,7 +159,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var ds = get_data().begin_parse();
     var stored_seqno = ds~load_uint(32);
     var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-    var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+    var stored_subwallet = ds~load_uint(80);
+    var public_key = ds.preload_uint(256);
     process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return();
   ;; }
