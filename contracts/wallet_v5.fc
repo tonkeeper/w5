@@ -98,7 +98,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_request(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
+() dispatch_request(int public_key, slice cs, slice immutable_tail, int stored_subwallet, int stored_seqno) impure inline {
   {-
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
@@ -106,6 +106,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
   -}
   set_actions_if_simple(cs);
+  ;; ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;; ------------------------------------------ INLINING BOUNDARY ------------------------------------------
   dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
@@ -122,7 +124,8 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
   var stored_subwallet = ds~load_uint(80);
   var public_key = ds.preload_uint(256);
-  ;; Note: If after modifications code becomes so large it undesirably splits to cells, replace with dispatch_complex_request_iref
+  ;; Note: If after modifications code becomes so large it undesirably splits to cells,
+  ;;       replace with dispatch_complex_request_iref. This won't affect test cases but will affect GGC slightly.
   dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
@@ -149,7 +152,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  dispatch_request(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
+  dispatch_request(public_key, cs, immutable_tail, stored_subwallet, stored_seqno);
 }
 
 () recv_external(slice body) impure {
