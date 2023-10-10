@@ -64,6 +64,8 @@ YELLOW="\e[33;1m"
 GREEN="\e[32;1m"
 ENDCOLOR="\e[0m"
 
+diff -C 5 build/wallet_v5.fif build/wallet_v5_vs.fif
+
 echo ""
 echo -e "${YELLOW}Lines: $LINES -> $NLINES$ENDCOLOR"
 for key in "${!mlen_new[@]}"
