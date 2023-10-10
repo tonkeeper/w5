@@ -5,6 +5,9 @@
 ;; LDUQ: s - x s' -1 or s 0 --NULLROTRIFNOT--> s - x s' -1 or # s 0
 (int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
 
+;; LDUQ: s - x s' -1 or s 0 --IFNOTRET--> x s' or RET
+(int, slice) load_uint32_or_ret(slice s) asm "32 LDUQ" "IFNOTRET";
+
 ;; Extensible wallet contract v5
 
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
@@ -140,11 +143,14 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; ignore all bounced messages
     return ();
   }
+  {-
   (int auth_kind, body, int success) = body.try_load_uint32(); ;; why there is no such stuff built in compiler?
   ifnot (success) {
     ;; ignore simple transfers
     return ();
   }
+  -}
+  (int auth_kind, body) = body.load_uint32_or_ret(); ;; Now that's some hot garbage!
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
