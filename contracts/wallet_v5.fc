@@ -6,7 +6,18 @@
 (int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
 
 ;; LDUQ: s - x s' -1 or s 0 --IFNOTRET--> x s' or RET
-(int, slice) load_uint32_or_ret(slice s) asm "32 LDUQ" "IFNOTRET";
+(int, slice) load_uint32_or_ret(slice s) impure asm "32 LDUQ" "IFNOTRET";
+
+{-
+  var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  if (flags & 1) {
+    ;; ignore all bounced messages
+    return ();
+  }
+-}
+() return_if_bounce(int flags) impure asm "1 PUSHINT" "AND" "IFRET";
+() return_if_not_equal(int a, int b) impure asm "EQUAL" "IFNOTRET";
+() return_if_not(int a) impure asm "IFNOTRET";
 
 ;; Extensible wallet contract v5
 
@@ -126,23 +137,28 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 () recv_external(slice body) impure {
   int auth_kind = body~load_uint(32);
-  if (auth_kind == 0x7369676E) { ;; "sign"
+  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
+  ;; if (auth_kind == 0x7369676E) { ;; "sign"
     var ds = get_data().begin_parse();
     var stored_seqno = ds~load_uint(32);
     var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
     var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
     process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return();
-  }
+  ;; }
 }
 
 () recv_internal(int msg_value, cell full_msg, slice body) impure {
   var full_msg_slice = full_msg.begin_parse();
   var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  {-
   if (flags & 1) {
     ;; ignore all bounced messages
     return ();
   }
+  -}
+  ;; return_if_bounce(3); <- as a test (since there are no bounce tests) - this works (breaks tests)!
+  return_if_bounce(flags);
   {-
   (int auth_kind, body, int success) = body.try_load_uint32(); ;; why there is no such stuff built in compiler?
   ifnot (success) {
@@ -165,17 +181,22 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
     var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
+    {-
     ifnot (success?) {
       ;; Note that some random contract may have deposited funds with this prefix,
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
+    -}
+    return_if_not(success?);
     dispatch_extension_request(body); ;; Special route for external address authenticated request
     return ();
 
   }
 
-  if (auth_kind == 0x7369676E) { ;; "sign"
+  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
+
+  ;; if (auth_kind == 0x7369676E) { ;; "sign"
 
     var ds = get_data().begin_parse();
     var stored_seqno = ds~load_uint(32);
@@ -186,7 +207,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
-  }
+  ;; }
 
 }
 
