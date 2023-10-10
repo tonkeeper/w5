@@ -70,7 +70,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return ();
 }
 
-() dispatch_complex_request(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
+() dispatch_complex_request_iref(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
   dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
@@ -79,18 +79,19 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     set_actions(cs.preload_ref());
     return ();
   }
-  dispatch_complex_request(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  dispatch_complex_request_iref(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_ext_request(slice cs) impure inline {
+() dispatch_extension_request(slice cs) impure inline {
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
   var ds = get_data().begin_parse();
   var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
   var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  ;; Note: If after modifications code becomes so large it undesirably splits to cells, replace with dispatch_complex_request_iref
   dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
@@ -112,10 +113,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
           .store_uint(stored_seqno, 32)
-          .store_slice(immutable_tail)
-          ;;  .store_uint(stored_subwallet, 80)
-          ;;  .store_uint(public_key, 256)
-          ;;  .store_dict(extensions)
+          .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
           .end_cell());
 
   commit();
@@ -128,7 +126,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   if (auth_kind == 0x7369676E) { ;; "sign"
     var ds = get_data().begin_parse();
     var stored_seqno = ds~load_uint(32);
-    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
+    var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
     var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
     process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
     return();
@@ -152,17 +150,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
 
-  ;; Since the space is not of concern... duplicating common code down into branches saves some gas!
-
   if (auth_kind == 0x6578746E) { ;; "extn"
-
-    ;; WTF?! Splitting this function into separate inline function noticeably INCREASES gas usage!
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
-    ;; var stored_seqno = ds~load_uint(32);
-    ;; var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-    ;; var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
     var extensions = ds.skip_bits(32 + 80 + 256).preload_dict();
 
     ;; Authenticate extension by its address.
@@ -173,9 +164,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
       return ();
     }
-    dispatch_ext_request(body); ;; Special route for external address authenticated request
-    ;; dispatch_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
+    dispatch_extension_request(body); ;; Special route for external address authenticated request
     return ();
+
   }
 
   if (auth_kind == 0x7369676E) { ;; "sign"
