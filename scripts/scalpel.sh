@@ -18,12 +18,14 @@ if [ ! -f build/wallet_v5.fif ]; then
     echo -e "$YELLOW* Creating comparation origin *$ENDCOLOR"
     echo "Use scalpel.sh -r to clean the instrument after commiting"
     func contracts/imports/stdlib.fc contracts/wallet_v5.fc > build/wallet_v5.fif
+    func -SR contracts/imports/stdlib.fc contracts/wallet_v5.fc >build/wallet_v5_x.fif 2>&1
 fi
 
 declare -A mlen
 declare -A mlen_new
 
 func contracts/imports/stdlib.fc contracts/wallet_v5.fc > build/wallet_v5_vs.fif
+func -SR contracts/imports/stdlib.fc contracts/wallet_v5.fc >build/wallet_v5_vs_x.fif 2>&1
 
 KEY=""
 CNT=0
