@@ -41,7 +41,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions_if_simple(slice cs) impure asm "DUP" "1 PLDU" "IFNOT:<{ PLDREF c5 POP RETALT }>" "DROP";
 
 ;; Dispatches already authenticated request.
-() dispatch_complex_request_inline(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
+() dispatch_complex_request_inline(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   var extensions = null();
 
   ;; Recurse into extended actions until we reach standard actions
@@ -95,11 +95,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return ();
 }
 
-() dispatch_complex_request_iref(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
-  dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
+() dispatch_complex_request_iref(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
+  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_request(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
+() dispatch_request(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   {-
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
@@ -107,7 +107,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
   -}
   set_actions_if_simple(cs); ;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary! For this wallet code works without it!
-  dispatch_complex_request_iref(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_extension_request(slice cs) impure inline {
@@ -121,9 +121,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var ds = get_data().begin_parse();
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  var (stored_subwallet, public_key) = (ds~load_uint(80), ds~load_uint(256));
+  var stored_subwallet = ds~load_uint(80);
+  var public_key = ds.preload_uint(256);
   ;; Note: If after modifications code becomes so large it undesirably splits to cells, replace with dispatch_complex_request_iref
-  dispatch_complex_request_inline(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -149,7 +150,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  dispatch_request(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  dispatch_request(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () recv_external(slice body) impure {

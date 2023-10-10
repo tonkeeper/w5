@@ -17,9 +17,6 @@ declare -A mlen
 declare -A mlen_new
 
 func contracts/imports/stdlib.fc contracts/wallet_v5.fc > build/wallet_v5_vs.fif
-LINES=$(grep -v -e '^//' -e '^DECLPROC'  -e '^[0-9]\+ DECLMETHOD' build/wallet_v5.fif | wc -l)
-NLINES=$(grep -v -e '^//' -e '^DECLPROC'  -e '^[0-9]\+ DECLMETHOD' build/wallet_v5_vs.fif | wc -l)
-
 
 KEY=""
 CNT=0
@@ -66,6 +63,8 @@ ENDCOLOR="\e[0m"
 
 diff -C 5 build/wallet_v5.fif build/wallet_v5_vs.fif
 
+LINES=$(grep -v -e '^//' -e '^DECLPROC'  -e '^[0-9]\+ DECLMETHOD' build/wallet_v5.fif | wc -l)
+NLINES=$(grep -v -e '^//' -e '^DECLPROC'  -e '^[0-9]\+ DECLMETHOD' build/wallet_v5_vs.fif | wc -l)
 echo ""
 echo -e "${YELLOW}Lines: $LINES -> $NLINES$ENDCOLOR"
 for key in "${!mlen_new[@]}"
