@@ -29,6 +29,14 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
+{-
+  ifnot (cs.preload_uint(1)) {
+    set_actions(cs.preload_ref());
+    return ();
+  }
+-}
+() set_actions_if_simple(slice cs) impure asm "DUP" "1 PLDU" "IFNOT:<{ PLDREF c5 POP RETALT }>" "DROP";
+
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
   var extensions = null();
@@ -89,18 +97,24 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () dispatch_request(slice cs, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
+  {-
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
+  -}
+  set_actions_if_simple(cs); ;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary!
   dispatch_complex_request_iref(cs, stored_seqno, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_extension_request(slice cs) impure inline {
+  {-
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
     return ();
   }
+  -}
+  set_actions_if_simple(cs); ;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary!
   var ds = get_data().begin_parse();
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
