@@ -37,8 +37,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     return ();
   }
 -}
-;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary! For this wallet code works without it!
-() set_actions_if_simple(slice cs) impure asm "DUP" "1 PLDU" "IFNOT:<{ PLDREF c5 POP RETALT }>" "DROP";
+() set_actions_if_simple(slice cs) impure asm "DUP" "1 PLDU" "IFNOTJMP:<{ PLDREF c5 POP }>" "DROP";
 
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
@@ -106,7 +105,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     return ();
   }
   -}
-  set_actions_if_simple(cs); ;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary! For this wallet code works without it!
+  set_actions_if_simple(cs);
   dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
@@ -117,7 +116,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     return ();
   }
   -}
-  set_actions_if_simple(cs); ;; !!! WARNING !!! Depends on RETALT, SAMERETALT injecting sometimes may be neccessary! For this wallet code works without it!
+  set_actions_if_simple(cs);
   var ds = get_data().begin_parse();
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions

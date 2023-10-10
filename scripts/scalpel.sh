@@ -3,14 +3,21 @@
 cd "$(dirname "$0")" || exit
 cd ..
 
+RED="\e[31;1m"
+YELLOW="\e[33;1m"
+GREEN="\e[32;1m"
+ENDCOLOR="\e[0m"
+
+if [[ "$1" == "-r" ]]; then
+    echo -e "$RED* Cleaning up the instrument *$ENDCOLOR"
+    rm -f build/wallet_v5*.fif
+fi
+
 if [ ! -f build/wallet_v5.fif ]; then
     mkdir -p build
-    echo "Creating comparation origin"
+    echo -e "$YELLOW* Creating comparation origin *$ENDCOLOR"
+    echo "Use scalpel.sh -r to clean the instrument after commiting"
     func contracts/imports/stdlib.fc contracts/wallet_v5.fc > build/wallet_v5.fif
-    LINES=$(grep -v -e '^//' -e '^DECLPROC'  -e '^[0-9]\+ DECLMETHOD' build/wallet_v5.fif | wc -l)
-    echo "Lines: $LINES"
-    echo "Repeat script execution to compare and see more details"
-    exit
 fi
 
 declare -A mlen
@@ -55,11 +62,6 @@ do
         CNT=$((CNT+1))
     fi
 done < build/wallet_v5_vs.fif
-
-RED="\e[31;1m"
-YELLOW="\e[33;1m"
-GREEN="\e[32;1m"
-ENDCOLOR="\e[0m"
 
 diff -C 5 build/wallet_v5.fif build/wallet_v5_vs.fif
 
