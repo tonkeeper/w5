@@ -1,6 +1,21 @@
 Improvements log
 ================
 
+In this section a table is presented with optimization results in several projections.
+
+Contest test cases display how much gas is used by contest-like methods of test suite, total saved and percentage
+as compared to the original commit gas use.
+
+Global gas counters were introduced after commit `Keep your functions close and vars even closer` to make a measurable
+metric of "tradeoff" between contest test cases and all other cases, that are totalled by their corresponding test suite.
+
+Only positive (no fail) tests without getters (since there is no point to optimize getters) are included in the table.
+
+This metric proven to be useful, because an `Localize extensions in loop and short-circ simple` commit resulted in very
+big jump in savings on the test cases, meanwhile it severly impaired all other cases (GGC increased a lot on it). As a
+result, the very next commit `Refactored internal message flows, good GGC value` managed to bring the GGC below the initial
+total level, with further commits do a `stable development` of contest test cases with improving GGC as well.
+
 +----------------------------------------------------------------+-------------------------------------------+--------------------------------+
 | Commit                                                         |               Contest test cases          |       Global gas counters      |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
@@ -90,3 +105,127 @@ Improvements log
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 
 N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
+
+Details and rationale
+=====================
+
+In this section, details of optimization in each commit are pointed out, sometimes with detailed rationale and reasoning,
+when neccessary (in some relatively controversial optimizations).
+
+**TODO: To be filled in!**
+
+Origin point: INITIAL
+---------------------
+
+The origin point, the state of the contract when the contest was started. It is used as a basis point to measure further improvements.
+
+Optimized unneccessary cell loads and operations
+------------------------------------------------
+
+Removed unneccessary always true check
+--------------------------------------
+
+Unrolled the common internal handler code
+-----------------------------------------
+
+Implicitly return from the external handler
+-------------------------------------------
+
+Reaped benefits of separated internal loaders
+---------------------------------------------
+
+Discarded unneccessary slice remains in dispatcher
+--------------------------------------------------
+
+Loaded auth_kind optionally using LDUQ instruction
+--------------------------------------------------
+
+Is ifnot a joke for you? (emits less instructions)
+--------------------------------------------------
+
+Localize extensions in loop and short-circ simple
+-------------------------------------------------
+
+Reordering int msg handlers somehow saves 10 gas
+------------------------------------------------
+
+Moving signature check higher saves some gas
+--------------------------------------------
+
+Reordering checks somehow sames some more gas
+---------------------------------------------
+
+Removing end_parse is -gas and +reliability
+-------------------------------------------
+
+Keep your functions close and vars even closer
+----------------------------------------------
+
+Refactored internal message flows, good GGC value
+-------------------------------------------------
+
+restore extensions var in loop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+move complex logic to inline_ref
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+optimize tail loading of extensions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+optimize preference for simple ext ops
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Reorganized inlining point for extension message flow
+-----------------------------------------------------
+
+Do not carry around params not needed (ext opt)
+-----------------------------------------------
+
+Optimize argument order to match stack
+--------------------------------------
+
+Swapping extn and sign order back saves some net gas
+----------------------------------------------------
+
+Short-circuit optimization of LDUQ with IFNOTRET
+------------------------------------------------
+
+Short-circuited some returns with asm
+-------------------------------------
+
+short-circuit flags check with asm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+short-circuit int msg sign last check with asm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+short-circuit ext msg sign last check with asm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+short-circuit extension dictionary check with asm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ASM-optimized simple action cases
+---------------------------------
+
+Optimized out more unneeded instructions if may RET
+---------------------------------------------------
+
+Removed another unneccessary DROP with preload uint
+---------------------------------------------------
+
+Reordered argument order to optimize stack operations
+-----------------------------------------------------
+
+Rewritten RETALT to IFNOTJMP - less gas, more reliable
+------------------------------------------------------
+
+Another argument stack optimization (psr -> dr call)
+----------------------------------------------------
+
+Black magic route optimization (drop some result later)
+-------------------------------------------------------
+
+Another black magic optimization (drop auth_kind later)
+-------------------------------------------------------
