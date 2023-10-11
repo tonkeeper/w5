@@ -29,7 +29,7 @@ next one becomes exponentionally harder to make. While result is not entirely pr
 by tests, this allows to instantly estimate whether there is some progress or not, since scalpel is executed immediately,
 while tests take approximately 10 seconds to execute.
 
-### Details of optimizations, their rationale and explanations, comparison of consumed gas both in test cases and not in test cases (global gas counter) are provided on [Gas improvements](Improvements.rst) page.
+### Details of optimizations, their rationale and explanations, comparison of consumed gas both in test cases and not in test cases (global gas counter) are provided on a dedicated page: [Gas improvements](Improvements.rst).
 
 ## Project structure
 
