@@ -6,9 +6,9 @@ Wallet V5 has 93% lower storage fees, can delegate payments for gas to third par
 
 ## Warning! Contest note! 
 
-<center>
+<div align="center">
 <img alt="Contest logo" src="contest.png" height="280" width="280">
-</center>
+</div>
 
 **Because of the extreme amount of optimizations, developer's discretion is advised!** *Evil laugh*
 
