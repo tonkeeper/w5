@@ -112,7 +112,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_extension_request(slice cs, var dummy) impure inline {
+() dispatch_extension_request(slice cs, var dummy1, var dummy2) impure inline {
   {-
   ifnot (cs.preload_uint(1)) {
     set_actions(cs.preload_ref());
@@ -120,8 +120,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
   -}
   set_actions_if_simple(cs);
-  dummy~impure_touch(); ;; DROP merged to 2DROP!
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+  dummy1~impure_touch(); ;; DROP merged to 2DROP!
+  dummy2~impure_touch(); ;; Thats 3 BLKDROP now!
   var ds = get_data().begin_parse();
   var stored_seqno = ds~load_uint(32);
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
@@ -213,9 +214,9 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     }
     -}
     ;; return_if_not(success?);
-    var dummy = extensions.udict_get_or_return(256, packed_sender_addr);
+    var wc = extensions.udict_get_or_return(256, packed_sender_addr);
     ;; dummy is for black magic optimization. will drop it later with 2drop
-    dispatch_extension_request(body, dummy); ;; Special route for external address authenticated request
+    dispatch_extension_request(body, auth_kind, wc); ;; Special route for external address authenticated request
     return ();
 
   }
