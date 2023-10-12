@@ -1,0 +1,12 @@
+#!/usr/bin/fift -s
+"Asm.fif" include
+"Disasm.fif" include
+
+"../build/wallet_v5_compiled.txt" file>B B>$ x>B B>boc
+
+."Disasm" cr
+dup <s disasm cr
+
+."Cell tree:" cr
+dup <s csr. cr
+

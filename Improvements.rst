@@ -16,6 +16,8 @@ big jump in savings on the test cases, meanwhile it severly impaired all other c
 result, the very next commit `Refactored internal message flows, good GGC value` managed to bring the GGC below the initial
 total level, with further commits do a `stable development` of contest test cases with improving GGC as well.
 
+**"Radical" optimizations involving modifying the compiler `Asm.fif` code are outlined in bold.**
+
 +----------------------------------------------------------------+-------------------------------------------+--------------------------------+
 | Commit                                                         |               Contest test cases          |       Global gas counters      |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
@@ -102,6 +104,8 @@ total level, with further commits do a `stable development` of contest test case
 | Black magic route optimization (drop some result later)        | 2818 | 3281 | 1916 | 8015  | 2235 | 21.8% | 64017 | 66370 | 37130 | 167517 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | Another black magic optimization (drop auth_kind later)        | 2818 | 3281 | 1906 | 8005  | 2245 | 21.9% | 64017 | 66370 | 37102 | 167489 |
++----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
+| **Moving recv handlers to entrypoint (root code cell)**        | 2829 | 3123 | 1748 | 7700  | 2550 | 24.9% | 63771 | 64759 | 36154 | 164684 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | *Reminder and origin point: INITIAL*                           | 3235 | 4210 | 2760 | 10250 | 0    | 0.00% | 64038 | 71163 | 38866 | 174067 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+

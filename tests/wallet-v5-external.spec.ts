@@ -155,7 +155,8 @@ describe('Wallet V5 sign auth external', () => {
             .endCell();
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true,
+                vmLogs: config.nanoscope ? 'vm_logs_full' : 'vm_logs_gas', debugLogs: true, print: true }
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 

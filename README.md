@@ -12,6 +12,8 @@ Wallet V5 has 93% lower storage fees, can delegate payments for gas to third par
 
 **Because of the extreme amount of optimizations, developer's discretion is advised!** *Evil laugh*
 
+**Also, there are some radical optimizations not for the faint-hearted. Proceed with care.** 
+
 The build system is the same as in the original Wallet V5, **no security features have been sacrificed**
 for performance improvements, that is - there are **practically no tradeoffs or compromises**.
 
@@ -28,6 +30,13 @@ stack comments and rewrites. This utility allowed to make some latter optimizati
 next one becomes exponentionally harder to make. While result is not entirely precise and is needed to be verified
 by tests, this allows to instantly estimate whether there is some progress or not, since scalpel is executed immediately,
 while tests take approximately 10 seconds to execute.
+
+### Radical optimizations: compiler improvements
+
+In this branch, there are so-called "radical" (by the contest creators!) optimizations that allow to save even more gas,
+but they require modification of `Asm.fif` in the compiler. In order to preserve existing compilation methods and pipelines,
+a fiftfunclib is patched with a modified version incorporating changes from `fift/Asm.fif` file.
+**[You can find more information about the changes here.](fift/README.md)**
 
 ### Details of optimizations, their rationale and explanations, comparison of consumed gas both in test cases and not in test cases (global gas counter) are provided on a dedicated page: [Gas improvements](Improvements.rst).
 

@@ -106,7 +106,8 @@ describe('Wallet V5 extensions auth', () => {
         const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true,
+                vmLogs: config.nanoscope ? 'vm_logs_full' : 'vm_logs_gas', debugLogs: true, print: true }
 
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
             value: toNano('0.1'),

@@ -1335,11 +1335,16 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
   { swap @proc-inlined INLINE } { CALLDICT } cond
 } dup : INLINECALL : INLINECALLDICT
 { @entrypoint @ null? @entrypointrecv @ null? and
-  0 @procdict @ @procdictkeylen idict@ not rot and abort"both `main` and `entry_point` procedures not defined" drop
+  0 @procdict @ @procdictkeylen idict@ dup { nip } if not and abort"both `main` and `entry_point` procedures not defined"
 } : @chkmaindef
 { @procdict @ @procdictkeylen idict- drop @procdict ! } : @remove-proc
 { -1111 @procdict @ @procdictkeylen idict@ { @entrypoint ! -1111 @remove-proc } if
-  -1112 @procdict @ @procdictkeylen idict@ { @entrypointrecv ! -1112 @remove-proc } if
+  -1112 @procdict @ @procdictkeylen idict@ {
+    @entrypointrecv !
+    -1112 @remove-proc
+     0 @procdict @ @procdictkeylen idict@ { 0 @remove-proc } if drop
+     -1 @procdict @ @procdictkeylen idict@ { -1 @remove-proc } if drop
+  } if
 } : @chkentrypoint
 { ."Procedure `" over type ."` index=" 2 pick . ." flags=0x" dup x. cr } : @showprocinfo
 // ( proc_name proc_idx f -- )  f:+1=declared, +2=defined, +4=inlined, +8=called, +16=method
@@ -1360,11 +1365,22 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
 } : @chkprocdef
 { @chkentrypoint @chkmaindef
   @proclist @ { dup null? not } {
-    uncons swap unpair over find not
-    { drop +": undefined procedure name in list" abort } if
-    drop tuck @procdict @ @procdictkeylen idict@ not
-    { +": procedure declared but left undefined" abort } if
-    drop swap 2dup @procinfo@ @chkprocdef (forget)
+    uncons swap unpair
+    @entrypointrecv @ null? not {
+      // If entry_point_recv is defined skip checking 0 and -1 in procdict
+      dup 0 = swap dup -1 = rot or not
+    } { -1 } cond
+    {
+      over find not
+      { drop +": undefined procedure name in list" abort } if
+      drop tuck @procdict @ @procdictkeylen idict@ not
+      { +": procedure declared but left undefined" abort } if
+      drop swap 2dup @procinfo@ @chkprocdef (forget)
+    }
+    {
+      2drop
+    }
+    cond
   } while
   drop @proclist null! @procinfo null! @proccnt 0!
   @procdict dup @ swap null!
@@ -1377,15 +1393,14 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
 forget @proclist  forget @proccnt
 { }END <{ SETCP0
   @entrypoint @ dup null? not { @addop } { drop } cond
-  @entrypointrecv @ dup null? not {
-    -rot
-    DUP CHKBOOL IFJMP:<{
-      // not 0 or -1 - must be get method or something else
-      swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG
+  @entrypointrecv @ null? not {
+    // 0 BITSIZE -> 0, -1 BITSIZE -> 1, anything else >1
+    DUP BITSIZE 1 RSHIFT# IFNOTJMP:<{
+      @entrypointrecv @ @addop
     }>
-    swap @addop
+    // not 0 or -1 - must be get method or something else
+    swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG
   } {
-    drop
     swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG
   } cond
 }> } : }END>
