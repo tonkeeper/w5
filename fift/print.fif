@@ -2,4 +2,10 @@
 "Asm.fif" include
 
 "../build/wallet_v5_code.fif" include
-<s csr.
+
+."Cell tree:" cr
+dup <s csr. cr
+
+."Compiled hex:" cr
+0 boc+>B B>x .dump cr cr
+
