@@ -79,7 +79,13 @@ describe('Wallet V5 extensions auth', () => {
         const deployer = await blockchain.treasury('deployer');
         sender = deployer.getSender();
 
+        if (config.analyze_deploy)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_full', debugLogs: true, print: true }
+
         const deployResult = await walletV5.sendDeploy(sender, toNano('0.05'));
+
+        if (config.analyze_deploy)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
