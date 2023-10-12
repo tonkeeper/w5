@@ -1,6 +1,6 @@
 const config: any = {
     // Inspect per-instruction execution in primary (contest) test cases
-    microscope: true,
+    microscope: false,
     // Full logs with stack dump at each step
     nanoscope: false,
     // Inspect per-instruction execution in deploying of contract

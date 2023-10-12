@@ -44,7 +44,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
-  var extensions = null();
+  var extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
@@ -60,21 +60,15 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
       int packed_addr = pack_address(wc, hash);
 
-      ifnot (immutable_tail.null?()) {
-        ;; immutable_tail = immutable_tail.skip_bits(80 + 256);
-        extensions = immutable_tail.skip_bits(80 + 256).preload_dict();
-        ;; ds.end_parse() NO MORE guarantees that there is no more data in immutable_tail
-        ;; immutable_tail~skip_bits(immutable_tail.slice_bits()); ;; more resiliency in case of extraneous data
-        immutable_tail = null();
-      }
-
       ;; Add extension
       if (op == 0x1c40db9f) {
         (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
         throw_unless(39, success?);
-      }
+      } else
       ;; Remove extension
-      if (op == 0x5eaef4a4) {
+      ;; if (op == 0x5eaef4a4)
+      ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
+      {
         (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
         throw_unless(40, success?);
       }
@@ -103,11 +97,13 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_request(int public_key, slice cs, slice immutable_tail, int stored_subwallet, int stored_seqno) impure inline {
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
-  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
-  ;; inline_ref required because otherwise it will produce undesirable JMPREF
-  dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
+() dispatch_complex_extension_request(slice cs) impure inline {
+  var ds = get_data().begin_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+  var stored_subwallet = ds~load_uint(80);
+  var public_key = ds.preload_uint(256);
+  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_extension_request(slice cs, var dummy1, var dummy2) impure inline {
@@ -116,14 +112,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
   dummy2~impure_touch(); ;; Thats 3 BLKDROP now!
-  var ds = get_data().begin_parse();
-  var stored_seqno = ds~load_uint(32);
-  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  var stored_subwallet = ds~load_uint(80);
-  var public_key = ds.preload_uint(256);
-  ;; Note: If after modifications code becomes so large it undesirably splits to cells,
-  ;;       replace with dispatch_complex_request_iref. This won't affect test cases but will affect GGC slightly.
-  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
+  dispatch_complex_extension_request(cs);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -152,7 +141,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  dispatch_request(public_key, cs, immutable_tail, stored_subwallet, stored_seqno);
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
+  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+
+  ;; inline_ref required because otherwise it will produce undesirable JMPREF
+  dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () process_external_message(slice body) impure inline {
