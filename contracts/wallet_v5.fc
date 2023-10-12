@@ -155,7 +155,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_request(public_key, cs, immutable_tail, stored_subwallet, stored_seqno);
 }
 
-() recv_external(slice body) impure inline {
+() process_external_message(slice body) impure inline {
   int auth_kind = body~load_uint(32);
 
   return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
@@ -169,7 +169,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return();
 }
 
-() recv_internal(int msg_value, cell full_msg, slice body) impure inline {
+() process_internal_message(int msg_value, cell full_msg, slice body) impure inline {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
@@ -218,16 +218,15 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Basic entry point for received messages (both external and internal).
 ;; recv_internal and recv_external are NOT implicitly used anymore!
+;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
 
 () entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
-  ;; no specific cross-optimizations YET, and already giving some gas saves in 2/3 paths!
-  ;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0!
-  if (is_external) {
-    recv_external(body);
-    ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
-  } else {
-    recv_internal(msg_value, full_msg, body);
+  ifnot (is_external) {
+    process_internal_message(msg_value, full_msg, body);
+    return();
   }
+  process_external_message(body);
+  ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
 }
 
 ;; Get methods

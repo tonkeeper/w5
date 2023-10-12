@@ -1342,8 +1342,8 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
   -1112 @procdict @ @procdictkeylen idict@ {
     @entrypointrecv !
     -1112 @remove-proc
-     0 @procdict @ @procdictkeylen idict@ { 0 @remove-proc } if drop
-     -1 @procdict @ @procdictkeylen idict@ { -1 @remove-proc } if drop
+     0 @procdict @ @procdictkeylen idict@ { 0 @remove-proc drop } if
+     -1 @procdict @ @procdictkeylen idict@ { -1 @remove-proc drop } if
   } if
 } : @chkentrypoint
 { ."Procedure `" over type ."` index=" 2 pick . ." flags=0x" dup x. cr } : @showprocinfo
