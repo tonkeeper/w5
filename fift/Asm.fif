@@ -1264,6 +1264,7 @@ variable @procinfo
 variable @gvarcnt
 variable @parent-state
 variable asm-mode  1 asm-mode !
+variable @entrypoint
 19 constant @procdictkeylen
 32 constant @zcount
 { pair @proclist @ cons @proclist ! } : @proclistadd
@@ -1332,8 +1333,10 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
 { dup @procdict @ @procdictkeylen idict@
   { swap @proc-inlined INLINE } { CALLDICT } cond
 } dup : INLINECALL : INLINECALLDICT
-{ 0 @procdict @ @procdictkeylen idict@ not abort"`main` procedure not defined" drop
+{ @entrypoint @ null? 0 @procdict @ @procdictkeylen idict@ not and abort"both `main` and `entry_point` procedures not defined" drop
 } : @chkmaindef
+{ -1111 @procdict @ @procdictkeylen idict@ { @entrypoint ! } if
+} : @chkentrypoint
 { @procdict @ @procdictkeylen idict- drop @procdict ! } : @remove-proc
 { ."Procedure `" over type ."` index=" 2 pick . ." flags=0x" dup x. cr } : @showprocinfo
 // ( proc_name proc_idx f -- )  f:+1=declared, +2=defined, +4=inlined, +8=called, +16=method
@@ -1352,7 +1355,7 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
   } if
   drop 2drop
 } : @chkprocdef
-{ @chkmaindef
+{ @chkentrypoint @chkmaindef
   @proclist @ { dup null? not } {
     uncons swap unpair over find not
     { drop +": undefined procedure name in list" abort } if
@@ -1369,7 +1372,9 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
   @oldctx @ context!  @oldcurrent @ current!
 } : }END
 forget @proclist  forget @proccnt
-{ }END <{ SETCP0 swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG }> } : }END>
+{ }END <{ SETCP0
+  @entrypoint @ dup null? not { @addop } if
+  swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG }> } : }END>
 { }END> b> } : }END>c
 { }END>c <s } : }END>s
 
@@ -1378,6 +1383,7 @@ forget @proclist  forget @proccnt
 -2 constant run_ticktock
 -3 constant split_prepare
 -4 constant split_install
+-1111 constant entry_point
 
 { asm-mode 0 3 ~! } : asm-no-remove-unused
 { asm-mode 1 1 ~! } : asm-remove-unused   // enabled by default

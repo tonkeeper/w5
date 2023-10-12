@@ -101,10 +101,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
-() dispatch_complex_request(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure {
-  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
-}
-
 () dispatch_request(int public_key, slice cs, slice immutable_tail, int stored_subwallet, int stored_seqno) impure inline {
   set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
@@ -155,6 +151,10 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   commit();
 
   dispatch_request(public_key, cs, immutable_tail, stored_subwallet, stored_seqno);
+}
+
+(slice, int) entry_point(slice body, int meth_id) impure {
+  return (body, meth_id);
 }
 
 () recv_external(slice body) impure {
