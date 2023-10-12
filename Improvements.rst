@@ -239,3 +239,13 @@ Black magic route optimization (drop some result later)
 
 Another black magic optimization (drop auth_kind later)
 -------------------------------------------------------
+
+Moving recv handlers to entrypoint (root code cell)
+---------------------------------------------------
+
+Rearranged entrypoint conditions flow, compiler fix
+---------------------------------------------------
+
+some commits not affecting the main test branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
