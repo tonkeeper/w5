@@ -1265,6 +1265,7 @@ variable @gvarcnt
 variable @parent-state
 variable asm-mode  1 asm-mode !
 variable @entrypoint
+variable @entrypointrecv
 19 constant @procdictkeylen
 32 constant @zcount
 { pair @proclist @ cons @proclist ! } : @proclistadd
@@ -1333,11 +1334,13 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
 { dup @procdict @ @procdictkeylen idict@
   { swap @proc-inlined INLINE } { CALLDICT } cond
 } dup : INLINECALL : INLINECALLDICT
-{ @entrypoint @ null? 0 @procdict @ @procdictkeylen idict@ not and abort"both `main` and `entry_point` procedures not defined" drop
+{ @entrypoint @ null? @entrypointrecv @ null? and
+  0 @procdict @ @procdictkeylen idict@ not rot and abort"both `main` and `entry_point` procedures not defined" drop
 } : @chkmaindef
-{ -1111 @procdict @ @procdictkeylen idict@ { @entrypoint ! } if
-} : @chkentrypoint
 { @procdict @ @procdictkeylen idict- drop @procdict ! } : @remove-proc
+{ -1111 @procdict @ @procdictkeylen idict@ { @entrypoint ! -1111 @remove-proc } if
+  -1112 @procdict @ @procdictkeylen idict@ { @entrypointrecv ! -1112 @remove-proc } if
+} : @chkentrypoint
 { ."Procedure `" over type ."` index=" 2 pick . ." flags=0x" dup x. cr } : @showprocinfo
 // ( proc_name proc_idx f -- )  f:+1=declared, +2=defined, +4=inlined, +8=called, +16=method
 { // @showprocinfo
@@ -1373,8 +1376,19 @@ Fift-wordlist dup @oldcurrent ! @oldctx !
 } : }END
 forget @proclist  forget @proccnt
 { }END <{ SETCP0
-  @entrypoint @ dup null? not { @addop } if
-  swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG }> } : }END>
+  @entrypoint @ dup null? not { @addop } { drop } cond
+  @entrypointrecv @ dup null? not {
+    -rot
+    DUP CHKBOOL IFJMP:<{
+      // not 0 or -1 - must be get method or something else
+      swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG
+    }>
+    swap @addop
+  } {
+    drop
+    swap @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG
+  } cond
+}> } : }END>
 { }END> b> } : }END>c
 { }END>c <s } : }END>s
 
@@ -1384,6 +1398,7 @@ forget @proclist  forget @proccnt
 -3 constant split_prepare
 -4 constant split_install
 -1111 constant entry_point
+-1112 constant entry_point_recv
 
 { asm-mode 0 3 ~! } : asm-no-remove-unused
 { asm-mode 1 1 ~! } : asm-remove-unused   // enabled by default

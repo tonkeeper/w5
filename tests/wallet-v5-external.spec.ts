@@ -24,7 +24,6 @@ import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDes
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
-import * as fs from "fs";
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: -1, subwalletNumber: 0 });
 
