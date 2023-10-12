@@ -153,7 +153,11 @@ describe('Wallet V5 sign auth external', () => {
             )
             .endCell();
 
+        blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
 
         expect(receipt.transactions.length).toEqual(2);
         accountForGas(receipt.transactions);

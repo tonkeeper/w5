@@ -3,7 +3,7 @@
 #include "imports/stdlib.fc";
 
 ;; LDUQ: s - x s' -1 or s 0 --NULLROTRIFNOT--> s - x s' -1 or # s 0
-(int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
+;; (int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
 
 ;; LDUQ: s - x s' -1 or s 0 --IFNOTRET--> x s' or RET
 (int, slice) load_uint32_or_ret(slice s) impure asm "32 LDUQ" "IFNOTRET";
@@ -16,6 +16,7 @@
   }
 -}
 () return_if_bounce(int flags) impure asm "1 PUSHINT" "AND" "IFRET";
+
 () return_if_not_equal(int a, int b) impure asm "EQUAL" "IFNOTRET";
 () return_if_not(int a) impure asm "IFNOTRET";
 
@@ -95,32 +96,26 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () dispatch_complex_request_iref(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure inline_ref {
+  ;; this function is explicitly included as an inline reference - not completely inlined
+  ;; completely inlining it causes undesirable code split and noticeable gas increase in some paths
+  dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
+}
+
+() dispatch_complex_request(int stored_seqno, slice cs, slice immutable_tail, int stored_subwallet, int public_key) impure {
   dispatch_complex_request_inline(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_request(int public_key, slice cs, slice immutable_tail, int stored_subwallet, int stored_seqno) impure inline {
-  {-
-  ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref());
-    return ();
-  }
-  -}
-  set_actions_if_simple(cs);
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
-  ;; ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  ;; ------------------------------------------ INLINING BOUNDARY ------------------------------------------
+  ;; inline_ref required because otherwise it will produce undesirable JMPREF
   dispatch_complex_request_iref(stored_seqno, cs, immutable_tail, stored_subwallet, public_key);
 }
 
 () dispatch_extension_request(slice cs, var dummy1, var dummy2) impure inline {
-  {-
-  ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref());
-    return ();
-  }
-  -}
-  set_actions_if_simple(cs);
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+  ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
   dummy2~impure_touch(); ;; Thats 3 BLKDROP now!
   var ds = get_data().begin_parse();
@@ -135,12 +130,15 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
 () process_signed_request(slice body, int stored_seqno, slice immutable_tail, int stored_subwallet, int public_key) impure inline {
+  ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
+
   var signature = body~load_bits(512);
   throw_unless(35, check_signature(slice_hash(body), signature, public_key));
 
   var cs = body;
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
 
+  ;; Only such checking order results in least amount of gas
   throw_unless(34, subwallet_id == stored_subwallet);
   throw_unless(33, msg_seqno == stored_seqno);
   throw_if(36, valid_until <= now());
@@ -161,44 +159,34 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 () recv_external(slice body) impure {
   int auth_kind = body~load_uint(32);
+
   return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
-  ;; if (auth_kind == 0x7369676E) { ;; "sign"
-    var ds = get_data().begin_parse();
-    var stored_seqno = ds~load_uint(32);
-    var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-    var stored_subwallet = ds~load_uint(80);
-    var public_key = ds.preload_uint(256);
-    process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
-    return();
-  ;; }
+
+  var ds = get_data().begin_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+  var stored_subwallet = ds~load_uint(80);
+  var public_key = ds.preload_uint(256);
+  process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  return();
 }
 
 () recv_internal(int msg_value, cell full_msg, slice body) impure {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
+
   var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
-  {-
-  if (flags & 1) {
-    ;; ignore all bounced messages
-    return ();
-  }
-  -}
   ;; return_if_bounce(3); <- as a test (since there are no bounce tests) - this works (breaks tests)!
-  return_if_bounce(flags);
-  {-
-  (int auth_kind, body, int success) = body.try_load_uint32(); ;; why there is no such stuff built in compiler?
-  ifnot (success) {
-    ;; ignore simple transfers
-    return ();
-  }
-  -}
-  (int auth_kind, body) = body.load_uint32_or_ret(); ;; Now that's some hot garbage!
+  return_if_bounce(flags); ;; <- if (flags & 1) { return (); }
+
+  (int auth_kind, body) = body.load_uint32_or_ret(); ;; loads uint32 from body or returns if not enough bits right away
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
 
-  if (auth_kind == 0x6578746E) { ;; "extn"
+  ;; IFJMPREF
+  if (auth_kind == 0x6578746E) { ;; "extn" authenticated by extension
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
@@ -206,37 +194,27 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
     ;; Authenticate extension by its address.
     int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
-    ;; var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
-    {-
-    ifnot (success?) {
-      ;; Note that some random contract may have deposited funds with this prefix,
-      ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-      return ();
-    }
-    -}
-    ;; return_if_not(success?);
-    var wc = extensions.udict_get_or_return(256, packed_sender_addr);
-    ;; dummy is for black magic optimization. will drop it later with 2drop
+    ;; Note that some random contract may have deposited funds with this prefix,
+    ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
+    var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
+
+    ;; auth_kind and wc are passed into dispatch_extension_request and later are dropped in batch with 3 BLKDROP
     dispatch_extension_request(body, auth_kind, wc); ;; Special route for external address authenticated request
     return ();
 
   }
 
-  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
+  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign" authenticated by signature
 
-  ;; if (auth_kind == 0x7369676E) { ;; "sign"
+  var ds = get_data().begin_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+  var stored_subwallet = ds~load_uint(80);
+  var public_key = ds.preload_uint(256);
 
-    var ds = get_data().begin_parse();
-    var stored_seqno = ds~load_uint(32);
-    var immutable_tail = ds; ;; keep immutable tail for fast commit storage and extensions retrieval if needed
-    var stored_subwallet = ds~load_uint(80);
-    var public_key = ds.preload_uint(256);
-
-    ;; Process the rest of the slice just like the signed request.
-    process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
-    return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
-
-  ;; }
+  ;; Process the rest of the slice just like the signed request.
+  process_signed_request(body, stored_seqno, immutable_tail, stored_subwallet, public_key);
+  return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
 }
 
