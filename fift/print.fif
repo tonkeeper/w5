@@ -1,0 +1,5 @@
+#!/usr/bin/fift -s
+"Asm.fif" include
+
+"../build/wallet_v5_code.fif" include
+<s csr.
