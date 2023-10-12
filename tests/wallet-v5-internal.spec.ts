@@ -17,6 +17,7 @@ import { WalletV4 } from '../wrappers/wallet-v4';
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
+import { default as config } from './config';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -147,14 +148,16 @@ describe('Wallet V5 sign auth internal', () => {
             )
             .endCell();
 
-        blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+        if (config.microscope)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(actionsList)
         });
 
-        blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
+        if (config.microscope)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
 
         expect(receipt.transactions.length).toEqual(3);
         accountForGas(receipt.transactions);
