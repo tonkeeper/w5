@@ -152,7 +152,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 
-() process_external_message(slice body) impure inline {
+() recv_external(slice body) impure inline {
   ;; int auth_kind = body~load_uint(32);
   ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
   body = enforce_and_remove_sign_prefix(body);
@@ -165,7 +165,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 (slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
 
-() process_internal_message(int msg_value, cell full_msg, slice body) impure inline {
+() recv_internal(int msg_value, cell full_msg, slice body) impure inline {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
@@ -217,12 +217,14 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 ;; recv_internal and recv_external are NOT implicitly used anymore!
 ;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
 
+;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
+;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
 () entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
   ifnot (is_external) {
-    process_internal_message(msg_value, full_msg, body);
+    recv_internal(msg_value, full_msg, body);
     return();
   }
-  process_external_message(body);
+  recv_external(body);
   ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
 }
 
