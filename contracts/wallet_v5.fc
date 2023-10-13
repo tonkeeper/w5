@@ -37,6 +37,8 @@
 (slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
 (slice) check_and_remove_extn_prefix_or_ret(slice body) impure asm "x{6578746E} SDBEGINSQ" "IFNOTRET";
 
+() return_if_no_refs(slice s) impure asm "SREFS" "IFNOTRET";
+
 ;; Extensible wallet contract v5
 
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
@@ -190,12 +192,13 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; IFJMPREF
   if (is_extn) { ;; "extn" authenticated by extension
 
+    ;; Authenticate extension by its address.
+    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
+
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
     var extensions = ds.skip_bits(32 + 80 + 256).preload_dict();
 
-    ;; Authenticate extension by its address.
-    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
