@@ -56,7 +56,7 @@ variable @contX  variable @contY  variable @cdict
 { atom>$ type } : .atom
 { dup first .atom dup count 1 > { space 0 over count 2- { 1+ 2dup [] type .", " } swap times 1+ [] type } { drop } cond } : std-show-op
 { 0 over count 1- { 1+ 2dup [] type space } swap times drop first .atom } : stk-show-op
-{ @dismode @ 2 and { .indent ."// " @curop @ csr. } if } : .curop?
+{ @dismode @ 2 and { @curop @ csr. } if } : .curop?
 { .curop? .indent @dismode @ 1 and ' std-show-op ' stk-show-op cond cr
 } : show-simple-op
 { dup 4 u@ 9 = { 8 u@+ swap 15 and 3 << s@ } {
