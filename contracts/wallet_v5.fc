@@ -147,9 +147,12 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_iref(cs);
 }
 
+(slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
+
 () recv_external(slice body) impure {
-  int auth_kind = body~load_uint(32);
-  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
+  ;; int auth_kind = body~load_uint(32);
+  ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
+  body = enforce_and_remove_sign_prefix(body);
   process_signed_request(body);
   return();
 }
