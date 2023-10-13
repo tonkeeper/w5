@@ -100,12 +100,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_inline(cs);
 }
 
-() dispatch_extension_request(slice cs, var dummy1, var dummy2) impure inline {
+() dispatch_extension_request(slice cs, var dummy1) impure inline {
   set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
   ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
-  dummy2~impure_touch(); ;; Thats 3 BLKDROP now!
   dispatch_complex_request_iref(cs);
 }
 
@@ -157,6 +156,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return();
 }
 
+(slice, int) check_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINSQ";
+(slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
+
+(slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
+
 () process_internal_message(int msg_value, cell full_msg, slice body) impure inline {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
@@ -165,14 +169,16 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; return_if_bounce(3); <- as a test (since there are no bounce tests) - this works (breaks tests)!
   return_if_bounce(flags); ;; <- if (flags & 1) { return (); }
 
-  (int auth_kind, body) = body.load_uint32_or_ret(); ;; loads uint32 from body or returns if not enough bits right away
+  ;; (int auth_kind, body) = body.load_uint32_or_ret(); ;; loads uint32 from body or returns if not enough bits right away
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
 
+  (body, int is_extn) = check_and_remove_extn_prefix(body);
+
   ;; IFJMPREF
-  if (auth_kind == 0x6578746E) { ;; "extn" authenticated by extension
+  if (is_extn) { ;; "extn" authenticated by extension
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
@@ -185,12 +191,13 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
 
     ;; auth_kind and wc are passed into dispatch_extension_request and later are dropped in batch with 3 BLKDROP
-    dispatch_extension_request(body, auth_kind, wc); ;; Special route for external address authenticated request
+    dispatch_extension_request(body, wc); ;; Special route for external address authenticated request
     return ();
 
   }
 
-  return_if_not_equal(auth_kind, 0x7369676E); ;; "sign" authenticated by signature
+  ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign" authenticated by signature
+  body = check_and_remove_sign_prefix_or_ret(body);
 
   ;; Process the rest of the slice just like the signed request.
   process_signed_request(body);
