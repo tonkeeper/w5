@@ -16,6 +16,7 @@
   }
 -}
 () return_if_bounce(int flags) impure asm "1 PUSHINT" "AND" "IFRET";
+;; () extravagant_return_if_bounce(int flags) impure asm "c0 PUSH" "0 IFBITJMP" "DROP";
 
 () return_if_not_equal(int a, int b) impure asm "EQUAL" "IFNOTRET";
 () return_if_not(int a) impure asm "IFNOTRET";
