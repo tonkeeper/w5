@@ -1,0 +1,33 @@
+;; Basic entry point for received messages (both external and internal).
+;; recv_internal and recv_external are NOT implicitly used anymore!
+;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
+
+;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
+;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
+
+;; Not supported in the main (conservative) branch.
+;; Please use the entrypoint branch for the best gas optimizations and usage!
+{-
+  Direct gas comparison on a specific commit between main and entrypoint:
+                       main entrypoint
+   External test case: 2699 2707 (a bit more due to if ordering, making it way around messes up cell slicing completely)
+   Internal test case: 3165 2963
+  Extension test case: 1828 1626
+
+                        main  entrypoint
+   External global ctr: 59108 58893 (not all is bad with external messages overall)
+   Internal global ctr: 63031 61011
+  Extension global ctr: 34141 32929
+-}
+
+
+{-
+() entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
+  ifnot (is_external) {
+    recv_internal(msg_value, full_msg, body);
+    return();
+  }
+  recv_external(body);
+  ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
+}
+-}

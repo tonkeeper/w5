@@ -105,14 +105,38 @@ total level, with further commits do a `stable development` of contest test case
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | Backported FunC optimizations from entrypoint branch           | 2782 | 3373 | 1824 | 7979  | 2245 | 22.1% | 60011 | 64810 | 34138 | 158959 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
-| Use SDBEGINS to enforce "sign" prefix in external message      | 2710 | 3373 | 1824 | 7907  | 2343 | 22.9% | 59147 | 64810 | 34138 | 158095 |
+| Use SDBEGINS to enforce prefix in external message             | 2710 | 3373 | 1824 | 7907  | 2343 | 22.9% | 59147 | 64810 | 34138 | 158095 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | Use SDBEGINSQ to check internal message prefixes               | 2710 | 3283 | 1736 | 7729  | 2521 | 24.6% | 59237 | 64090 | 33578 | 156905 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
+| Backport some optimizations from EP and coalesce code          | 2699 | 3165 | 1828 | 7692  | 2558 | 25.0% | 59108 | 63031 | 34141 | 156280 |
++----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | *Reminder and origin point: INITIAL*                           | 3235 | 4210 | 2760 | 10250 | 0    | 0.00% | 64038 | 71163 | 38866 | 174067 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
-| *Current state of the latest entrypoint branch commit*         | 2718 | 2984 | 1647 | 7349  | 2901 | 28.3% | 59045 | 61210 | 33044 | 153299 |
-+----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
+
+*It seems that backporting optimization wiggles around values here and there.* To get the maximum possible gas savings please consider taking
+a look at `entrypoint` ("radical") branch. Since optimizations are carefully made there, they decrease used gas by all cases without compromises.
+
+As an example, here is a comparison of used gas in main ("conservative") and entrypoint ("radical") branches:
+
++-----------------+----------+----------------+
+| Test case       | main gas | entrypoint gas |
++=================+==========+================+
+| External        | 2699     | **2707**       |
++-----------------+----------+----------------+
+| Internal        | 3165     | **2963**       |
++-----------------+----------+----------------+
+| Extension       | 1828     | **1626**       |
++-----------------+----------+----------------+
+| External GGC    | 59108    | **58893**      |
++-----------------+----------+----------------+
+| Internal GGC    | 63031    | **61011**      |
++-----------------+----------+----------------+
+| Extension GGC   | 34141    | **32929**      |
++-----------------+----------+----------------+
+
+The external test case uses a tiny miniscule more gas due to if ordering, making it way around messes up cell slicing completely.
+Nevertheless, external global counter is still less, therefore the overall result is not that bad.
 
 N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
 
