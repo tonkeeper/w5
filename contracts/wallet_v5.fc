@@ -41,7 +41,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     return ();
   }
 -}
-() set_actions_if_simple(slice cs) impure asm "DUP" "1 PLDU" "IFNOTJMP:<{ PLDREF c5 POP }>" "DROP";
+() set_actions_if_simple(slice cs) impure asm "DUP" "SDFIRST" "IFNOTJMP:<{ PLDREF c5 POP }>" "DROP";
 
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(slice cs) impure inline {
