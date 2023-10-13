@@ -44,7 +44,7 @@
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
 ;; This allows us to save on wrapping the address in a cell and make plugin requests cheaper.
 ;; This method also unpacks address hash if you pass packed hash with the original wc.
-int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
+int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
@@ -74,7 +74,7 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     ;; Add/remove extensions
     if ((is_add_ext) | (is_del_ext)) {
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
-      int packed_addr = pack_address(wc, hash);
+      int packed_addr = pack_address((wc, hash) );
 
       var ds = get_data().begin_parse();
       var data_bits = ds~load_bits(32 + 80 + 256);
