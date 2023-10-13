@@ -18,6 +18,9 @@
 () return_if_bounce(int flags) impure asm "1 PUSHINT" "AND" "IFRET";
 ;; () extravagant_return_if_bounce(int flags) impure asm "c0 PUSH" "0 IFBITJMP" "DROP";
 
+;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
+() slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
+
 () return_if_not_equal(int a, int b) impure asm "EQUAL" "IFNOTRET";
 () return_if_not(int a) impure asm "IFNOTRET";
 
@@ -166,9 +169,13 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
-  var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  ;; var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
   ;; return_if_bounce(3); <- as a test (since there are no bounce tests) - this works (breaks tests)!
-  return_if_bounce(flags); ;; <- if (flags & 1) { return (); }
+  ;; return_if_bounce(flags); ;; <- if (flags & 1) { return (); }
+  var s_flags = full_msg_slice~load_bits(4);
+  slicy_return_if_bounce(s_flags);
+
+  ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
 
   ;; (int auth_kind, body) = body.load_uint32_or_ret(); ;; loads uint32 from body or returns if not enough bits right away
 
