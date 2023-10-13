@@ -28,6 +28,15 @@
 
 () ignore_int_params(int msg_value, cell full_msg) impure asm "NOP";
 
+(slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
+(slice) enforce_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINS";
+
+(slice, int) check_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINSQ";
+(slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
+
+(slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
+(slice) check_and_remove_extn_prefix_or_ret(slice body) impure asm "x{6578746E} SDBEGINSQ" "IFNOTRET";
+
 ;; Extensible wallet contract v5
 
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
@@ -150,8 +159,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   dispatch_complex_request_iref(cs);
 }
 
-(slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
-
 () recv_external(slice body) impure inline {
   ;; int auth_kind = body~load_uint(32);
   ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
@@ -159,11 +166,6 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   process_signed_request(body);
   return();
 }
-
-(slice, int) check_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINSQ";
-(slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
-
-(slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
 
 () recv_internal(int msg_value, cell full_msg, slice body) impure inline {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
@@ -213,20 +215,11 @@ int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 }
 
-;; Basic entry point for received messages (both external and internal).
-;; recv_internal and recv_external are NOT implicitly used anymore!
-;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
-
 ;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
 ;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
-() entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
-  ifnot (is_external) {
-    recv_internal(msg_value, full_msg, body);
-    return();
-  }
-  recv_external(body);
-  ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
-}
+
+;; Moved to separate file to make it easier to backport stuff from entrypoint branch to main branch
+#include "imports/entrypoint.fc";
 
 ;; Get methods
 

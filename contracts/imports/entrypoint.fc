@@ -1,0 +1,14 @@
+;; Basic entry point for received messages (both external and internal).
+;; recv_internal and recv_external are NOT implicitly used anymore!
+;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
+
+;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
+;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
+() entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
+  ifnot (is_external) {
+    recv_internal(msg_value, full_msg, body);
+    return();
+  }
+  recv_external(body);
+  ignore_int_params(msg_value, full_msg); ;; does nothing but prevents dropping them which will cause stack underflow
+}
