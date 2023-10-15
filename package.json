@@ -7,6 +7,7 @@
         "build:v5": "blueprint build wallet_v5",
         "deploy-library": "npx blueprint run deployLibrary",
         "deploy-wallet": "blueprint run deployWalletV5",
+        "deploy-wallet-no-lib": "blueprint run deployWalletV5WithoutLibrary",
         "print-wallet-code": "ts-node ./scripts/printWalletCode.ts",
         "test": "jest",
         "scalpel": "bash ./scripts/scalpel.sh",
