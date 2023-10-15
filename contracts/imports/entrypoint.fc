@@ -2,9 +2,12 @@
 ;; recv_internal and recv_external are NOT implicitly used anymore!
 ;; use msg_value or full_msg ONLY if you are sure these are supplied - if is_external = 0! ~ a very thin ice here!
 
+() ensure_that_compiler_supports_entrypoint() impure asm "def? @entrypointrecv not { B{0d0a0d0a54686520636f6d70696c657220646f6573206e6f7420737570706f727420656e747279706f696e742e20506c65617365206d616b652073757265207468617420796f7520617265207573696e6720656e747279706f696e74206272616e63682c2070617463686573206469726563746f7279206973206e6f7420656d7074792c2064656c657465206e6f64655f6d6f64756c6573206469726563746f727920616e642072756e200d0a0d0a202020206e706d20696e7374616c6c200d0a0d0a66697273742c20616e64207468656e200d0a0d0a202020206e706d2072756e20706f7374696e7374616c6c0d0a0d0a746f206d616b65207375726520746861742074686520636f727265637420636f6d70696c65722076657273696f6e207769746820656e747279706f696e7420666561747572657320697320696e7374616c6c65642e} .s B>$ abort } if";
+
 ;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
 ;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
 () entry_point_recv(int msg_value, cell full_msg, slice body, int is_external) impure {
+  ensure_that_compiler_supports_entrypoint();
   ifnot (is_external) {
     recv_internal(msg_value, full_msg, body);
     return();
