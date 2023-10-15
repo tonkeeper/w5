@@ -31,6 +31,10 @@ next one becomes exponentionally harder to make. While result is not entirely pr
 by tests, this allows to instantly estimate whether there is some progress or not, since scalpel is executed immediately,
 while tests take approximately 10 seconds to execute.
 
+The **print script** is specialized on anyzing the code on a very low level - it compiles the code using system
+func and fift binaries, decompiles it, and prints the result as a decompilation, cell tree and compiled hex. Also,
+amount of free bits and bytes in root cell are printed (that is VERY important for gas usage).
+
 ### Radical optimizations: compiler improvements
 
 In this branch, there are so-called "radical" (by the contest creators!) optimizations that allow to save even more gas,
