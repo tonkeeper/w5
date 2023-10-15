@@ -111,11 +111,13 @@ total level, with further commits do a ``stable development`` of contest test ca
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | Backport some optimizations from EP and coalesce code          | 2699 | 3165 | 1828 | 7692  | 2558 | 25.0% | 59108 | 63031 | 34141 | 156280 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
+| Optimized instructions order for extension and fix args        | 2699 | 3165 | 1810 | 7674  | 2576 | 25.1% | 59108 | 63031 | 34033 | 156172 |
++----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 | *Reminder and origin point: INITIAL*                           | 3235 | 4210 | 2760 | 10250 | 0    | 0.00% | 64038 | 71163 | 38866 | 174067 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 
 *It seems that backporting optimization wiggles around values here and there.* To get the maximum possible gas savings please consider taking
-a look at `entrypoint` ("radical") branch. Since optimizations are carefully made there, they decrease used gas by all cases without compromises.
+a look at ``entrypoint`` ("radical") branch. Since optimizations are carefully made there, they decrease used gas by all cases without compromises.
 
 As an example, here is a comparison of used gas in main ("conservative") and entrypoint ("radical") branches:
 
@@ -439,3 +441,7 @@ Using SDBEGINSQ to check for starting zero
 Like with internal message prefixes, it is more efficient to use a single ``SDBEGINSQ`` instruction to check that prefix
 starts with zero and is a simple action even than preload a single uint1.
 
+Optimized instructions order for extension and fix args
+-------------------------------------------------------
+Adjusting order of instructions in extension branch allows to save some gas. Also fixed arguments because TON Plugin
+was complaining (no gas or instructions change whatsoever).
