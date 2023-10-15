@@ -79,7 +79,7 @@ describe('Wallet V5 extensions auth', () => {
         seqno = 0;
     });
 
-    it('Do a transfer form extension', async () => {
+    it('Do a transfer from extension', async () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
@@ -118,7 +118,7 @@ describe('Wallet V5 extensions auth', () => {
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 
-    it('Do two transfers form extension and add other extension', async () => {
+    it('Do two transfers from extension and add other extension', async () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
@@ -187,7 +187,7 @@ describe('Wallet V5 extensions auth', () => {
         );
     });
 
-    it('Add and remove other extension form extension', async () => {
+    it('Add and remove other extension from extension', async () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
