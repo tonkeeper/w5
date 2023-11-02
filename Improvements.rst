@@ -128,7 +128,7 @@ total level, with further commits do a ``stable development`` of contest test ca
 | *Reminder and origin point: INITIAL*                           | 3235 | 4210 | 2760 | 10205 | 0    | 0.00% | 64038 | 71163 | 38866 | 174067 |
 +----------------------------------------------------------------+------+------+------+-------+------+-------+-------+-------+-------+--------+
 
-N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
+N.B. Contest multiplier: 9905/10205 = 0.9706 (approximate) -> place multipliers ~ 0.3235342, 0.0970602, 0.0485301
 
 Details and rationale
 =====================
