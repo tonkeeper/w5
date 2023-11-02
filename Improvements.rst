@@ -128,19 +128,19 @@ As an example, here is a comparison of used gas in main ("conservative") and ent
 +-----------------+----------+----------------+
 | Internal        | 3165     | **2963**       |
 +-----------------+----------+----------------+
-| Extension       | 1828     | **1626**       |
+| Extension       | 1810     | **1608**       |
 +-----------------+----------+----------------+
 | External GGC    | 59108    | **58893**      |
 +-----------------+----------+----------------+
 | Internal GGC    | 63031    | **61011**      |
 +-----------------+----------+----------------+
-| Extension GGC   | 34141    | **32929**      |
+| Extension GGC   | 34033    | **32821**      |
 +-----------------+----------+----------------+
 
 The external test case uses a tiny miniscule more gas due to if ordering, making it way around messes up cell slicing completely.
 Nevertheless, external global counter is still less, therefore the overall result is not that bad.
 
-N.B. Contest multiplier: 9905/10250 = 0.9663 (approximate) -> place multipliers ~ 0.3221138, 0.0966341, 0.048317
+N.B. Contest multiplier: 9905/10205 = 0.9706 (approximate) -> place multipliers ~ 0.3235342, 0.0970602, 0.0485301
 
 Details and rationale
 =====================
