@@ -2,42 +2,15 @@
 
 #include "imports/stdlib.fc";
 
-;; LDUQ: s - x s' -1 or s 0 --NULLROTRIFNOT--> s - x s' -1 or # s 0
-;; (int, slice, int) try_load_uint32(slice s) asm "32 LDUQ" "NULLROTRIFNOT";
-
-;; LDUQ: s - x s' -1 or s 0 --IFNOTRET--> x s' or RET
-(int, slice) load_uint32_or_ret(slice s) impure asm "32 LDUQ" "IFNOTRET";
-
-{-
-  var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
-  if (flags & 1) {
-    ;; ignore all bounced messages
-    return ();
-  }
--}
-() return_if_bounce(int flags) impure asm "1 PUSHINT" "AND" "IFRET";
-;; () extravagant_return_if_bounce(int flags) impure asm "c0 PUSH" "0 IFBITJMP" "DROP";
-
 ;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
 () slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
 
-() return_if_not_equal(int a, int b) impure asm "EQUAL" "IFNOTRET";
-() return_if_not(int a) impure asm "IFNOTRET";
-
 (slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET IFNOTRET";
 
-() ignore_int_params(int msg_value, cell full_msg) impure asm "NOP";
-
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
-(slice) enforce_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINS";
-
-(slice, int) check_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINSQ";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
 (slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
-(slice) check_and_remove_extn_prefix_or_ret(slice body) impure asm "x{6578746E} SDBEGINSQ" "IFNOTRET";
-
-() return_if_no_refs(slice s) impure asm "SREFS" "IFNOTRET";
 
 ;; Extensible wallet contract v5
 
@@ -94,9 +67,9 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       }
 
       set_data(begin_cell()
-              .store_slice(data_bits)
-              .store_dict(extensions)
-              .end_cell());
+      .store_slice(data_bits)
+      .store_dict(extensions)
+      .end_cell());
     }
 
     ;; Other actions are no-op
@@ -148,9 +121,9 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
-          .store_uint(stored_seqno, 32)
-          .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
-          .end_cell());
+  .store_uint(stored_seqno, 32)
+  .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
+  .end_cell());
 
   commit();
 
@@ -162,32 +135,25 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () recv_external(slice body) impure inline {
-  ;; int auth_kind = body~load_uint(32);
-  ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign"
-  body = enforce_and_remove_sign_prefix(body);
+  body = enforce_and_remove_sign_prefix(body); ;; 0x7369676E ("sign")
   process_signed_request(body);
   return();
 }
 
-() recv_internal(int msg_value, cell full_msg, slice body) impure inline {
+() recv_internal(cell full_msg, slice body) impure inline {
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
-  ;; var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
-  ;; return_if_bounce(3); <- as a test (since there are no bounce tests) - this works (breaks tests)!
-  ;; return_if_bounce(flags); ;; <- if (flags & 1) { return (); }
-  var s_flags = full_msg_slice~load_bits(4);
+  var s_flags = full_msg_slice~load_bits(4); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
   slicy_return_if_bounce(s_flags);
 
   ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
-
-  ;; (int auth_kind, body) = body.load_uint32_or_ret(); ;; loads uint32 from body or returns if not enough bits right away
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
 
-  (body, int is_extn) = check_and_remove_extn_prefix(body);
+  (body, int is_extn) = check_and_remove_extn_prefix(body); ;; 0x6578746E ("extn")
 
   ;; IFJMPREF
   if (is_extn) { ;; "extn" authenticated by extension
@@ -209,8 +175,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   }
 
-  ;; return_if_not_equal(auth_kind, 0x7369676E); ;; "sign" authenticated by signature
-  body = check_and_remove_sign_prefix_or_ret(body);
+  body = check_and_remove_sign_prefix_or_ret(body); ;; 0x7369676E ("sign")
 
   ;; Process the rest of the slice just like the signed request.
   process_signed_request(body);
