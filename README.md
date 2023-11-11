@@ -2,7 +2,7 @@
 
 This is an extensible wallet specification aimed at replacing V4 and allowing arbitrary extensions.
 
-Wallet V5 has 93% lower storage fees, can delegate payments for gas to third parties and supports flexible extension mechanism.
+Wallet V5 has 25% lower fees, can delegate payments for gas to third parties and supports flexible extension mechanism.
 
 ## Project structure
 
