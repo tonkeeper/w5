@@ -1,4 +1,4 @@
-import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
+import { Blockchain, BlockchainTransaction, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, internal, Sender, SendMode, toNano } from 'ton-core';
 import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
@@ -42,13 +42,17 @@ describe('Wallet V5 sign auth external', () => {
 
     let ggc: bigint = BigInt(0);
     function accountForGas(transactions: BlockchainTransaction[]) {
-        transactions.forEach((tx) => {
-            ggc += ((tx?.description as TransactionDescriptionGeneric)?.computePhase as TransactionComputeVm)?.gasUsed ?? BigInt(0);
-        })
+        transactions.forEach(tx => {
+            ggc +=
+                (
+                    (tx?.description as TransactionDescriptionGeneric)
+                        ?.computePhase as TransactionComputeVm
+                )?.gasUsed ?? BigInt(0);
+        });
     }
 
-    afterAll(async() => {
-        console.log("EXTERNAL TESTS: Total gas " + ggc);
+    afterAll(async () => {
+        console.log('EXTERNAL TESTS: Total gas ' + ggc);
     });
 
     async function deployOtherWallet(
@@ -140,7 +144,7 @@ describe('Wallet V5 sign auth external', () => {
 
         const sendTxactionAction = beginCell()
             .storeUint(Opcodes.action_send_msg, 32)
-            .storeInt(SendMode.PAY_GAS_SEPARATELY, 8)
+            .storeInt(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, 8)
             .storeRef(sendTxMsg)
             .endCell();
 
@@ -155,12 +159,24 @@ describe('Wallet V5 sign auth external', () => {
             .endCell();
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+            blockchain.verbosity = {
+                ...blockchain.verbosity,
+                blockchainLogs: true,
+                vmLogs: 'vm_logs_gas',
+                debugLogs: true,
+                print: true
+            };
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
+            blockchain.verbosity = {
+                ...blockchain.verbosity,
+                blockchainLogs: false,
+                vmLogs: 'none',
+                debugLogs: false,
+                print: false
+            };
 
         expect(receipt.transactions.length).toEqual(2);
         accountForGas(receipt.transactions);
@@ -225,7 +241,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const msg = internal({ to: receiver.address, value: forwardValue });
 
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
@@ -261,8 +279,8 @@ describe('Wallet V5 sign auth external', () => {
         const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue2, bounce: true });
 
         const actionsList = packActionsList([
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg1),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg2)
         ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
@@ -306,7 +324,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([
             new ActionAddExtension(testExtension1),
             new ActionAddExtension(testExtension2),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
         ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
@@ -356,8 +374,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const actionsList = packActionsList([
             new ActionSetData(beginCell().storeUint(239, 32).endCell()),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg1),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg2)
         ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
@@ -409,7 +427,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const actionsList = packActionsList([
             new ActionSetData(beginCell().storeUint(239, 32).endCell()),
-            ...msges.map(msg => new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg))
+            ...msges.map(
+                msg => new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+            )
         ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
@@ -513,7 +533,7 @@ describe('Wallet V5 sign auth external', () => {
 
         const mesagesCell = beginCell()
             .storeUint(0, 8)
-            .storeUint(SendMode.PAY_GAS_SEPARATELY, 8)
+            .storeUint(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, 8)
             .storeRef(sendTxMsg)
             .endCell();
 
@@ -603,7 +623,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const vu = validUntil();
 
@@ -642,7 +664,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const payload = beginCell()
             .storeUint(WALLET_ID.serialized, 80)
@@ -674,7 +698,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const payload = beginCell()
             .storeUint(WALLET_ID.serialized, 80)
@@ -704,7 +730,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const payload = beginCell()
             .storeUint(WALLET_ID.serialized, 80)
@@ -734,7 +762,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const payload = beginCell()
             .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 80)
@@ -764,7 +794,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const walletBalanceBefore = (await blockchain.getContract(walletV5.address)).balance;
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const payload = beginCell()
             .storeUint(WALLET_ID.serialized, 80)
@@ -818,5 +850,95 @@ describe('Wallet V5 sign auth external', () => {
         const walletBalanceAfter = (await blockchain.getContract(walletV5.address)).balance;
 
         expect(walletBalanceBefore).toEqual(walletBalanceAfter);
+    });
+
+    it('Should throw is actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+
+        expect(receipt.transactions.length).toEqual(1);
+        expect(
+            (
+                (receipt.transactions[0].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(37);
+        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
+    });
+
+    it('Should skip all transfers is actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
+        const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const testReceiver2 = Address.parse('Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs');
+        const forwardValue = toNano(0.001);
+
+        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver1)).balance;
+        const receiver2BalanceBefore = (await blockchain.getContract(testReceiver2)).balance;
+
+        const msg1 = createMsgInternal({ dest: testReceiver1, value: forwardValue });
+        const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue });
+
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg2)
+        ]);
+
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        const receiver1BalanceAfter = (await blockchain.getContract(testReceiver1)).balance;
+        const receiver2BalanceAfter = (await blockchain.getContract(testReceiver2)).balance;
+
+        expect(receipt.transactions.length).toEqual(1);
+        expect(
+            (
+                (receipt.transactions[0].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(37);
+
+        expect(receiver1BalanceBefore).toEqual(receiver1BalanceAfter);
+        expect(receiver2BalanceBefore).toEqual(receiver2BalanceAfter);
+    });
+
+    it('Should skip extended action if actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const extensionAddress = Address.parse('Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs');
+        const forwardValue = toNano(0.001);
+
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+        const extensionsBefore = await walletV5.getExtensionsArray();
+        expect(extensionsBefore.length).toEqual(0);
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actionsList = packActionsList([
+            new ActionAddExtension(extensionAddress),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
+        ]);
+
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+
+        expect(receipt.transactions.length).toEqual(1);
+        expect(
+            (
+                (receipt.transactions[0].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(37);
+        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
+
+        const extensionsAfter = await walletV5.getExtensionsArray();
+        expect(extensionsAfter.length).toEqual(0);
     });
 });

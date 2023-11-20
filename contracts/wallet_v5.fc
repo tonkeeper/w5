@@ -9,6 +9,7 @@
 
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
+(slice, int) check_and_remove_msg_acion_prefix(slice body) impure asm "x{0EC3C86D} SDBEGINSQ";
 
 (slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
 
@@ -22,13 +23,16 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
-{-
-  ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref());
-    return ();
+() check_actions_list(slice action_list) impure inline {
+  while (~ action_list.slice_data_empty?()) {
+    (slice cs, int send_msg?) = check_and_remove_msg_acion_prefix(action_list);
+    if (send_msg?) {
+      int mode = cs.preload_uint(8);
+      throw_unless(37, mode | 2 == mode);
+    }
+    action_list = action_list.preload_ref().begin_parse();
   }
--}
-() set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF c5 POP }>" "DROP";
+}
 
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(slice cs) impure inline {
@@ -78,7 +82,9 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs.preload_ref());
+  cell list = cs.preload_ref();
+  check_actions_list(list.begin_parse());
+  set_actions(list);
   return ();
 }
 
@@ -89,7 +95,12 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () dispatch_extension_request(slice cs, var dummy1) impure inline {
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
+  ifnot (cs.preload_uint(1)) {
+    cell list = cs.preload_ref();
+    check_actions_list(list.begin_parse());
+    set_actions(list);
+    return ();
+  }
   ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
   ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
@@ -127,9 +138,12 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
-  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
-
+  ifnot (cs.preload_uint(1)) {
+    cell list = cs.preload_ref();
+    check_actions_list(list.begin_parse());
+    set_actions(list);
+    return ();
+  }
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
   dispatch_complex_request_iref(cs);
 }
