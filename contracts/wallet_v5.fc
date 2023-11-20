@@ -2,145 +2,192 @@
 
 #include "imports/stdlib.fc";
 
+;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
+() slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
+
+(slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET IFNOTRET";
+
+(slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
+(slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
+
+(slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
+
 ;; Extensible wallet contract v5
 
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
 ;; This allows us to save on wrapping the address in a cell and make plugin requests cheaper.
 ;; This method also unpacks address hash if you pass packed hash with the original wc.
-int pack_address(int wc, int hash) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
+int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
+{-
+  ifnot (cs.preload_uint(1)) {
+    set_actions(cs.preload_ref());
+    return ();
+  }
+-}
+() set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF c5 POP }>" "DROP";
+
 ;; Dispatches already authenticated request.
-() dispatch_request(slice cs, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure inline {
+() dispatch_complex_request_inline(slice cs) impure inline {
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
-      int op = cs~load_uint(32);
+    int op = cs~load_uint(32);
 
-      ;; Raw set_data
-      if (op == 0x1ff8ea0b) {
-          set_data(cs~load_ref());
+    ;; Raw set_data
+    if (op == 0x1ff8ea0b) {
+      set_data(cs~load_ref());
+    }
+
+    var is_add_ext = (op == 0x1c40db9f);
+    var is_del_ext = (op == 0x5eaef4a4);
+    ;; Add/remove extensions
+    if ((is_add_ext) | (is_del_ext)) {
+      (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
+      int packed_addr = pack_address((wc, hash) );
+
+      var ds = get_data().begin_parse();
+      var data_bits = ds~load_bits(32 + 80 + 256);
+      var extensions = ds.preload_dict();
+
+      ;; Add extension
+      if (is_add_ext) {
+        (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
+        throw_unless(39, success?);
+      } else
+      ;; Remove extension
+      ;; if (op == 0x5eaef4a4)
+      ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
+      {
+        (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
+        throw_unless(40, success?);
       }
 
-      ;; Add/remove extensions
-      if ((op == 0x1c40db9f) | (op == 0x5eaef4a4)) {
-          (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
-          int packed_addr = pack_address(wc, hash);
+      set_data(begin_cell()
+              .store_slice(data_bits)
+              .store_dict(extensions)
+              .end_cell());
+    }
 
-          ;; Add extension
-          if (op == 0x1c40db9f) {
-              (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
-              throw_unless(39, success?);
-          }
-          ;; Remove extension
-          if (op == 0x5eaef4a4) {
-              (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
-              throw_unless(40, success?);
-          }
-
-          set_data(begin_cell()
-            .store_uint(stored_seqno, 32)
-            .store_uint(stored_subwallet, 80)
-            .store_uint(public_key, 256)
-            .store_dict(extensions)
-            .end_cell());
-      }
-
-      ;; Other actions are no-op
-      ;; FIXME: is it costlier to check for unsupported actions and throw?
-      cs = cs~load_ref().begin_parse();
+    ;; Other actions are no-op
+    ;; FIXME: is it costlier to check for unsupported actions and throw?
+    cs = cs.preload_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs~load_ref());
+  set_actions(cs.preload_ref());
   return ();
 }
 
+() dispatch_complex_request_iref(slice cs) impure inline_ref {
+  ;; this function is explicitly included as an inline reference - not completely inlined
+  ;; completely inlining it causes undesirable code split and noticeable gas increase in some paths
+  dispatch_complex_request_inline(cs);
+}
+
+() dispatch_extension_request(slice cs, var dummy1) impure inline {
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
+  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+  ;;
+  dummy1~impure_touch(); ;; DROP merged to 2DROP!
+  dispatch_complex_request_iref(cs);
+}
+
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice body, int stored_seqno, int stored_subwallet, int public_key, cell extensions) impure inline {
+() process_signed_request(slice body) impure inline {
+  ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
   var signature = body~load_bits(512);
+
   var cs = body;
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
 
-  throw_if(36, valid_until <= now());
+  var ds = get_data().begin_parse();
+  var stored_seqno = ds~load_uint(32);
+  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+  var stored_subwallet = ds~load_uint(80);
+  var public_key = ds.preload_uint(256);
+
+  ;; Only such checking order results in least amount of gas
+  throw_unless(35, check_signature(slice_hash(body), signature, public_key));
   throw_unless(33, msg_seqno == stored_seqno);
   throw_unless(34, subwallet_id == stored_subwallet);
-  throw_unless(35, check_signature(slice_hash(body), signature, public_key));
+  throw_if(36, valid_until <= now());
 
   accept_message();
 
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
-    .store_uint(stored_seqno, 32)
-    .store_uint(stored_subwallet, 80)
-    .store_uint(public_key, 256)
-    .store_dict(extensions)
-    .end_cell());
+          .store_uint(stored_seqno, 32)
+          .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
+          .end_cell());
 
   commit();
 
-  dispatch_request(cs, stored_seqno, stored_subwallet, public_key, extensions);
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
+  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+
+  ;; inline_ref required because otherwise it will produce undesirable JMPREF
+  dispatch_complex_request_iref(cs);
 }
 
-() recv_external(slice body) impure {
-  var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
-  int auth_kind = body~load_uint(32);
-  if (auth_kind == 0x7369676E) { ;; "sign"
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  } else {
-    ;; FIXME: probably need to throw here?
-    return ();
-  }
+() recv_external(slice body) impure inline {
+  body = enforce_and_remove_sign_prefix(body); ;; 0x7369676E ("sign")
+  process_signed_request(body);
+  return();
 }
 
-
-() recv_internal(int msg_value, cell full_msg, slice body) impure {
+() recv_internal(cell full_msg, slice body) impure inline {
+  ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
-  var flags = full_msg_slice~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
-  if (flags & 1) {
-    ;; ignore all bounced messages
-    return ();
-  }
-  if (body.slice_bits() < 32) {
-    ;; ignore simple transfers
-    return ();
-  }
-  int auth_kind = body~load_uint(32);
+
+  var s_flags = full_msg_slice~load_bits(4); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  slicy_return_if_bounce(s_flags);
+
+  ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x7369676E "sign" authenticated by signature
-  if (auth_kind != 0x6578746E) & (auth_kind != 0x7369676E) { ;; "extn" & "sign"
-    ;; ignore all unauthenticated messages
-    return ();
-  }
 
-  var ds = get_data().begin_parse();
-  var (stored_seqno, stored_subwallet, public_key, extensions) = (ds~load_uint(32), ds~load_uint(80), ds~load_uint(256), ds~load_dict());
-  ds.end_parse();
+  (body, int is_extn) = check_and_remove_extn_prefix(body); ;; 0x6578746E ("extn")
 
-  if (auth_kind == 0x6578746E) { ;; "extn"
+  ;; IFJMPREF
+  if (is_extn) { ;; "extn" authenticated by extension
+
     ;; Authenticate extension by its address.
-    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr()));
-    var (_, success?) = extensions.udict_get?(256, packed_sender_addr);
-    if ~(success?) {
-      ;; Note that some random contract may have deposited funds with this prefix,
-      ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-      return ();
-    }
-    dispatch_request(body, stored_seqno, stored_subwallet, public_key, extensions);
+    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
+
+    var ds = get_data().begin_parse();
+    ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
+    var extensions = ds.skip_bits(32 + 80 + 256).preload_dict();
+
+    ;; Note that some random contract may have deposited funds with this prefix,
+    ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
+    var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
+
+    ;; auth_kind and wc are passed into dispatch_extension_request and later are dropped in batch with 3 BLKDROP
+    dispatch_extension_request(body, wc); ;; Special route for external address authenticated request
+    return ();
+
   }
-  if (auth_kind == 0x7369676E) { ;; "sign"
-    ;; Process the rest of the slice just like the signed request.
-    process_signed_request(body, stored_seqno, stored_subwallet, public_key, extensions);
-  }
+
+  body = check_and_remove_sign_prefix_or_ret(body); ;; 0x7369676E ("sign")
+
+  ;; Process the rest of the slice just like the signed request.
+  process_signed_request(body);
+  return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
+
 }
 
+;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
+;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
+
+;; Moved to separate file to make it easier to backport stuff from entrypoint branch to main branch
+#include "imports/entrypoint.fc";
 
 ;; Get methods
 

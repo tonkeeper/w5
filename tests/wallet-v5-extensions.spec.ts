@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract } from '@ton-community/sandbox';
+import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
 import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
@@ -14,6 +14,7 @@ import {
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
+import { default as config } from './config';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -29,6 +30,17 @@ describe('Wallet V5 extensions auth', () => {
     let keypair: KeyPair;
     let sender: Sender;
     let seqno: number;
+
+    let ggc: bigint = BigInt(0);
+    function accountForGas(transactions: BlockchainTransaction[]) {
+        transactions.forEach((tx) => {
+            ggc += ((tx?.description as TransactionDescriptionGeneric)?.computePhase as TransactionComputeVm)?.gasUsed ?? BigInt(0);
+        })
+    }
+
+    afterAll(async() => {
+        console.log("EXTENSIONS TESTS: Total gas " + ggc);
+    });
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
@@ -93,12 +105,20 @@ describe('Wallet V5 extensions auth', () => {
 
         const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
+        if (config.microscope)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
             value: toNano('0.1'),
             body: actions
         });
 
+        if (config.microscope)
+            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
+
         expect(receipt.transactions.length).toEqual(3);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
             to: testReceiver,
@@ -152,6 +172,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(4);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
             to: testReceiver1,
@@ -202,6 +224,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt1.transactions.length).toEqual(2);
+        accountForGas(receipt1.transactions);
+
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -222,6 +246,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt2.transactions.length).toEqual(2);
+        accountForGas(receipt2.transactions);
+
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -247,6 +273,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
             Dictionary.Values.BigInt(8),
@@ -271,6 +299,8 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
             to: testReceiver,

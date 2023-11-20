@@ -8,7 +8,8 @@
         "deploy-library": "npx blueprint run deployLibrary",
         "deploy-wallet": "blueprint run deployWalletV5",
         "print-wallet-code": "ts-node ./scripts/printWalletCode.ts",
-        "test": "jest"
+        "test": "jest",
+        "scalpel": "bash ./scripts/scalpel.sh"
     },
     "devDependencies": {
         "@ton-community/blueprint": "^0.12.0",
