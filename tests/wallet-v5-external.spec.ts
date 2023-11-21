@@ -860,7 +860,9 @@ describe('Wallet V5 sign auth external', () => {
 
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
 
-        const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actionsList = packActionsList([
+            new ActionSendMsg(SendMode.CARRY_ALL_REMAINING_BALANCE, msg)
+        ]);
 
         const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 

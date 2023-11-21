@@ -27,8 +27,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   while (~ action_list.slice_data_empty?()) {
     (slice cs, int send_msg?) = check_and_remove_msg_acion_prefix(action_list);
     if (send_msg?) {
-      int mode = cs.preload_uint(8);
-      throw_unless(37, mode | 2 == mode);
+      throw_unless(37, (cs.preload_uint(8) >> 1) & 1);
     }
     action_list = action_list.preload_ref().begin_parse();
   }
