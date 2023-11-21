@@ -20,36 +20,14 @@
 ;; This method also unpacks address hash if you pass packed hash with the original wc.
 int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
-;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
-() set_actions(cell action_list) impure asm "c5 POP";
-
-() check_actions_list(slice action_list) impure inline {
-  while (~ action_list.slice_data_empty?()) {
-    (slice cs, int send_msg?) = check_and_remove_msg_acion_prefix(action_list);
-    if (send_msg?) {
-      int mode = cs.preload_uint(8);
-      throw_unless(37, mode | 2 == mode);
-    }
-    action_list = action_list.preload_ref().begin_parse();
-  }
-}
-
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(slice cs) impure inline {
-
-  ;; Recurse into extended actions until we reach standard actions
-  while (cs~load_uint(1)) {
+  while (~ cs.slice_data_empty?()) {
     int op = cs~load_uint(32);
 
-    ;; Raw set_data
-    if (op == 0x1ff8ea0b) {
-      set_data(cs~load_ref());
-    }
-
-    var is_add_ext = (op == 0x1c40db9f);
-    var is_del_ext = (op == 0x5eaef4a4);
-    ;; Add/remove extensions
-    if ((is_add_ext) | (is_del_ext)) {
+    if (op == 0x0ec3c86d) { ;; Send msg
+      send_raw_message(cs~load_ref(), cs.preload_uint(8) | 2);
+    } elseif ((op == 0x5eaef4a4) | (op == 0x1c40db9f)) { ;; Add / Remove Extension
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
       int packed_addr = pack_address((wc, hash) );
 
@@ -58,53 +36,27 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       var extensions = ds.preload_dict();
 
       ;; Add extension
-      if (is_add_ext) {
+      if (op == 0x1c40db9f) {
         (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
         throw_unless(39, success?);
-      } else
-      ;; Remove extension
-      ;; if (op == 0x5eaef4a4)
-      ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
-      {
+      } else { ;; Remove extension
         (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
         throw_unless(40, success?);
       }
 
       set_data(begin_cell()
-              .store_slice(data_bits)
-              .store_dict(extensions)
-              .end_cell());
+      .store_slice(data_bits)
+      .store_dict(extensions)
+      .end_cell());
+    } elseif (op == 0x1ff8ea0b) { ;; Raw set_data
+      set_data(cs~load_ref());
+    } elseif (op == 0xad4de08e) { ;; Set code
+      set_code(cs~load_ref());
     }
 
-    ;; Other actions are no-op
-    ;; FIXME: is it costlier to check for unsupported actions and throw?
     cs = cs.preload_ref().begin_parse();
   }
-  ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
-  ;; Simply set the C5 register with all pre-computed actions:
-  cell list = cs.preload_ref();
-  check_actions_list(list.begin_parse());
-  set_actions(list);
   return ();
-}
-
-() dispatch_complex_request_iref(slice cs) impure inline_ref {
-  ;; this function is explicitly included as an inline reference - not completely inlined
-  ;; completely inlining it causes undesirable code split and noticeable gas increase in some paths
-  dispatch_complex_request_inline(cs);
-}
-
-() dispatch_extension_request(slice cs, var dummy1) impure inline {
-  ifnot (cs.preload_uint(1)) {
-    cell list = cs.preload_ref();
-    check_actions_list(list.begin_parse());
-    set_actions(list);
-    return ();
-  }
-  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
-  ;;
-  dummy1~impure_touch(); ;; DROP merged to 2DROP!
-  dispatch_complex_request_iref(cs);
 }
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
@@ -138,14 +90,8 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   commit();
 
-  ifnot (cs.preload_uint(1)) {
-    cell list = cs.preload_ref();
-    check_actions_list(list.begin_parse());
-    set_actions(list);
-    return ();
-  }
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
-  dispatch_complex_request_iref(cs);
+  dispatch_complex_request_inline(cs);
 }
 
 () recv_external(slice body) impure inline {
@@ -181,10 +127,10 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-    var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
+    extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
 
     ;; auth_kind and wc are passed into dispatch_extension_request and later are dropped in batch with 3 BLKDROP
-    dispatch_extension_request(body, wc); ;; Special route for external address authenticated request
+    dispatch_complex_request_inline(body); ;; Special route for external address authenticated request
     return ();
 
   }

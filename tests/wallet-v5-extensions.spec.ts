@@ -4,7 +4,7 @@ import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
-import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './utils';
+import {bufferToBigInt, createMsgInternal, packAddress, toAtTonCoreMsgInternal, validUntil} from './utils';
 import {
     ActionAddExtension,
     ActionRemoveExtension,
@@ -16,6 +16,8 @@ import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
 import { CommonMessageInfoInternal } from 'ton-core/src/types/CommonMessageInfo';
+import {beginCell as beginCell_} from "@ton/core/dist/boc/Builder";
+import {storeOutList} from "@ton/core";
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -103,10 +105,10 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const forwardValue = toNano(0.001);
+        const forwardValue = toNano(0.0001);
         const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
 
-        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue, bounce: true });
 
         const actions = packActionsList([
             new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
@@ -122,7 +124,7 @@ describe('Wallet V5 extensions auth', () => {
             };
 
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
-            value: toNano('0.1'),
+            value: toNano('1'),
             body: actions
         });
 
@@ -341,7 +343,7 @@ describe('Wallet V5 extensions auth', () => {
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
     });
 
-    it('Should throw if actions list contains send_raw_message without IGNORE_ERRORS flag', async () => {
+    it('Should replace message mode with mode | IGNORE_ERRORS flag', async () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
@@ -362,131 +364,33 @@ describe('Wallet V5 extensions auth', () => {
 
         expect(receipt.transactions.length).toEqual(3);
 
-        expect(receipt.transactions).not.toHaveTransaction({
+        expect(receipt.transactions).toHaveTransaction({
             from: walletV5.address,
             to: testReceiver,
             value: forwardValue
         });
 
-        expect(
-            (receipt.transactions[2].inMessage!.info as CommonMessageInfoInternal).bounced
-        ).toBeTruthy();
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
+        const expectedOutList = beginCell_()
+            .store(
+                storeOutList([
+                    {
+                        type: 'sendMsg',
+                        mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                        outMsg: toAtTonCoreMsgInternal(msg)
+                    }
+                ])
+            )
+            .endCell();
 
-        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
-        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
-    });
-
-    it('Should throw and cancel all transfers if actions list contains send_raw_message without IGNORE_ERRORS flag', async () => {
-        await walletV5.sendInternalSignedMessage(sender, {
-            value: toNano(0.1),
-            body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
-        });
-
-        const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const testReceiver2 = Address.parse('Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs');
-        const forwardValue = toNano(0.001);
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver1)).balance;
-        const receiver2BalanceBefore = (await blockchain.getContract(testReceiver2)).balance;
-
-        const msg1 = createMsgInternal({ dest: testReceiver1, value: forwardValue });
-        const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue });
-
-        const actions = packActionsList([
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg2),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1)
-        ]);
-
-        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
-            value: toNano('0.1'),
-            body: actions
-        });
-
-        expect(receipt.transactions.length).toEqual(3);
-
-        expect(receipt.transactions).not.toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver1,
-            value: forwardValue
-        });
-        expect(receipt.transactions).not.toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver2,
-            value: forwardValue
-        });
-
-        expect(
-            (receipt.transactions[2].inMessage!.info as CommonMessageInfoInternal).bounced
-        ).toBeTruthy();
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
-
-        const receiver1BalanceAfter = (await blockchain.getContract(testReceiver1)).balance;
-        const receiver2BalanceAfter = (await blockchain.getContract(testReceiver2)).balance;
-        expect(receiver1BalanceBefore).toEqual(receiver1BalanceAfter);
-        expect(receiver2BalanceBefore).toEqual(receiver2BalanceAfter);
-    });
-
-    it('Should throw and cancel all extended actions if actions list contains send_raw_message without IGNORE_ERRORS flag', async () => {
-        await walletV5.sendInternalSignedMessage(sender, {
-            value: toNano(0.1),
-            body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
-        });
-
-        const extensionsListBefore = await walletV5.getExtensionsArray();
-        expect(extensionsListBefore.length).toEqual(1);
-
-        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const newExtensionAddress = Address.parse(
-            'Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs'
+        expect(bufferToBigInt(expectedOutList.hash())).toEqual(
+            (receipt.transactions[1].description as TransactionDescriptionGeneric).actionPhase!
+                .actionListHash
         );
-        const forwardValue = toNano(0.001);
-        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
 
-        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-
-        const actions = packActionsList([
-            new ActionAddExtension(newExtensionAddress),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
-        ]);
-
-        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
-            value: toNano('0.1'),
-            body: actions
-        });
-
-        expect(receipt.transactions.length).toEqual(3);
-
-        expect(receipt.transactions).not.toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver,
-            value: forwardValue
-        });
-
-        expect(
-            (receipt.transactions[2].inMessage!.info as CommonMessageInfoInternal).bounced
-        ).toBeTruthy();
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
+        const fee = receipt.transactions[2].totalFees.coins;
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
-        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
 
-        const extensionListAfter = await walletV5.getExtensionsArray();
-        expect(extensionListAfter.length).toEqual(1);
-        expect(extensionListAfter[0].equals(extensionsListBefore[0])).toBeTruthy();
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 });

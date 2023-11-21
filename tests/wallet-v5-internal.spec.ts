@@ -4,7 +4,13 @@ import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
-import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './utils';
+import {
+    bufferToBigInt,
+    createMsgInternal,
+    packAddress,
+    toAtTonCoreMsgInternal,
+    validUntil
+} from './utils';
 import {
     ActionAddExtension,
     ActionRemoveExtension,
@@ -18,6 +24,7 @@ import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDes
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
+import { storeOutList, beginCell as beginCell_ } from '@ton/core';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -143,13 +150,8 @@ describe('Wallet V5 sign auth internal', () => {
             .endCell();
 
         const actionsList = beginCell()
-            .storeUint(0, 1)
-            .storeRef(
-                beginCell()
-                    .storeRef(beginCell().endCell())
-                    .storeSlice(sendTxactionAction.beginParse())
-                    .endCell()
-            )
+            .storeSlice(sendTxactionAction.beginParse())
+            .storeRef(beginCell().endCell())
             .endCell();
 
         if (config.microscope)
@@ -206,9 +208,8 @@ describe('Wallet V5 sign auth internal', () => {
             .endCell();
 
         const actionsList = beginCell()
-            .storeUint(1, 1)
-            .storeRef(beginCell().storeUint(0, 1).storeRef(beginCell().endCell()).endCell())
             .storeSlice(addExtensionAction.beginParse())
+            .storeRef(beginCell().endCell())
             .endCell();
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
@@ -935,7 +936,7 @@ describe('Wallet V5 sign auth internal', () => {
         ).toEqual(0);
     });
 
-    it('Should throw is actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
+    it('Should replace send_raw_msg mode with mode | IGNORE_ERRORS', async () => {
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
 
@@ -950,19 +951,39 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
+        expect(receipt.transactions.length).toEqual(3);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const expectedOutList = beginCell_()
+            .store(
+                storeOutList([
+                    {
+                        type: 'sendMsg',
+                        mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                        outMsg: toAtTonCoreMsgInternal(msg)
+                    }
+                ])
+            )
+            .endCell();
+
+        expect(bufferToBigInt(expectedOutList.hash())).toEqual(
+            (receipt.transactions[1].description as TransactionDescriptionGeneric).actionPhase!
+                .actionListHash
+        );
+
+        const fee = receipt.transactions[2].totalFees.coins;
+
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
 
-        expect(receipt.transactions.length).toEqual(2);
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
-        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 
-    it('Should skip all transfers is actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
+    it('Should replace send_raw_msg mode with mode | IGNORE_ERRORS when it is needed', async () => {
         const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const testReceiver2 = Address.parse('Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs');
         const forwardValue = toNano(0.001);
@@ -983,54 +1004,48 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
+        expect(receipt.transactions.length).toEqual(4);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver1,
+            value: forwardValue
+        });
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver2,
+            value: forwardValue
+        });
+
+        const expectedOutList = beginCell_()
+            .store(
+                storeOutList([
+                    {
+                        type: 'sendMsg',
+                        mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                        outMsg: toAtTonCoreMsgInternal(msg1)
+                    },
+                    {
+                        type: 'sendMsg',
+                        mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                        outMsg: toAtTonCoreMsgInternal(msg2)
+                    }
+                ])
+            )
+            .endCell();
+
+        expect(bufferToBigInt(expectedOutList.hash())).toEqual(
+            (receipt.transactions[1].description as TransactionDescriptionGeneric).actionPhase!
+                .actionListHash
+        );
+
+        const fee1 = receipt.transactions[2].totalFees.coins;
+        const fee2 = receipt.transactions[3].totalFees.coins;
+
         const receiver1BalanceAfter = (await blockchain.getContract(testReceiver1)).balance;
         const receiver2BalanceAfter = (await blockchain.getContract(testReceiver2)).balance;
 
-        expect(receipt.transactions.length).toEqual(2);
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
-
-        expect(receiver1BalanceBefore).toEqual(receiver1BalanceAfter);
-        expect(receiver2BalanceBefore).toEqual(receiver2BalanceAfter);
-    });
-
-    it('Should skip extended action if actions list contains send_raw_msg without IGNORE_ERRORS flag', async () => {
-        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const extensionAddress = Address.parse('Ef8j2KMyfpO6GEmt168K2KFohbxRcmKAa0wLBVdFAyYwhAHs');
-        const forwardValue = toNano(0.001);
-
-        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
-        const extensionsBefore = await walletV5.getExtensionsArray();
-        expect(extensionsBefore.length).toEqual(0);
-
-        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(extensionAddress),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
-        ]);
-
-        const receipt = await walletV5.sendInternalSignedMessage(sender, {
-            value: toNano(0.1),
-            body: createBody(actionsList)
-        });
-
-        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
-
-        expect(receipt.transactions.length).toEqual(2);
-        expect(
-            (
-                (receipt.transactions[1].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(37);
-        expect(receiverBalanceBefore).toEqual(receiverBalanceAfter);
-
-        const extensionsAfter = await walletV5.getExtensionsArray();
-        expect(extensionsAfter.length).toEqual(0);
+        expect(receiver1BalanceAfter).toEqual(receiver1BalanceBefore + forwardValue - fee1);
+        expect(receiver2BalanceAfter).toEqual(receiver2BalanceBefore + forwardValue - fee2);
     });
 });
