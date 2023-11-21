@@ -19,11 +19,8 @@ export class ActionSendMsg {
     constructor(public readonly mode: SendMode, public readonly outMsg: MessageRelaxed) {}
 
     public serialize(): Cell {
-        return beginCell()
-            .storeUint(this.tag, 32)
-            .storeUint(this.mode, 8)
-            .storeRef(beginCell().store(storeMessageRelaxed(this.outMsg)).endCell())
-            .endCell();
+        const msg = beginCell().store(storeMessageRelaxed(this.outMsg)).endCell();
+        return beginCell().storeUint(this.tag, 32).storeUint(this.mode, 8).storeRef(msg).endCell();
     }
 }
 
@@ -131,8 +128,8 @@ function packActionsListOut(actions: (OutAction | ExtendedAction)[]): Cell {
     }
 
     return beginCell()
-        .storeRef(packActionsListOut(rest))
         .storeSlice(action.serialize().beginParse())
+        .storeRef(packActionsListOut(rest))
         .endCell();
 }
 
@@ -140,14 +137,10 @@ function packActionsListExtended(actions: (OutAction | ExtendedAction)[]): Cell 
     const [action, ...rest] = actions;
 
     if (!action || !isExtendedAction(action)) {
-        return beginCell()
-            .storeUint(0, 1)
-            .storeRef(packActionsListOut(actions.slice().reverse())) // tvm handles actions from c5 in reversed order
-            .endCell();
+        return packActionsListOut(actions);
     }
 
     return beginCell()
-        .storeUint(1, 1)
         .storeSlice(action.serialize().beginParse())
         .storeRef(packActionsListExtended(rest))
         .endCell();

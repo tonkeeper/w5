@@ -1,10 +1,10 @@
-import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
+import { Blockchain, BlockchainTransaction, SandboxContract } from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
 import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
-import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './utils';
+import {bufferToBigInt, createMsgInternal, packAddress, toAtTonCoreMsgInternal, validUntil} from './utils';
 import {
     ActionAddExtension,
     ActionRemoveExtension,
@@ -15,6 +15,9 @@ import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDes
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
+import { CommonMessageInfoInternal } from 'ton-core/src/types/CommonMessageInfo';
+import {beginCell as beginCell_} from "@ton/core/dist/boc/Builder";
+import {storeOutList} from "@ton/core";
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -33,13 +36,17 @@ describe('Wallet V5 extensions auth', () => {
 
     let ggc: bigint = BigInt(0);
     function accountForGas(transactions: BlockchainTransaction[]) {
-        transactions.forEach((tx) => {
-            ggc += ((tx?.description as TransactionDescriptionGeneric)?.computePhase as TransactionComputeVm)?.gasUsed ?? BigInt(0);
-        })
+        transactions.forEach(tx => {
+            ggc +=
+                (
+                    (tx?.description as TransactionDescriptionGeneric)
+                        ?.computePhase as TransactionComputeVm
+                )?.gasUsed ?? BigInt(0);
+        });
     }
 
-    afterAll(async() => {
-        console.log("EXTENSIONS TESTS: Total gas " + ggc);
+    afterAll(async () => {
+        console.log('EXTENSIONS TESTS: Total gas ' + ggc);
     });
 
     function createBody(actionsList: Cell) {
@@ -98,23 +105,37 @@ describe('Wallet V5 extensions auth', () => {
         });
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const forwardValue = toNano(0.001);
+        const forwardValue = toNano(0.0001);
         const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
 
-        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue, bounce: true });
 
-        const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actions = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: true, vmLogs: 'vm_logs_gas', debugLogs: true, print: true }
+            blockchain.verbosity = {
+                ...blockchain.verbosity,
+                blockchainLogs: true,
+                vmLogs: 'vm_logs_gas',
+                debugLogs: true,
+                print: true
+            };
 
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
-            value: toNano('0.1'),
+            value: toNano('1'),
             body: actions
         });
 
         if (config.microscope)
-            blockchain.verbosity = { ...blockchain.verbosity, blockchainLogs: false, vmLogs: 'none', debugLogs: false, print: false }
+            blockchain.verbosity = {
+                ...blockchain.verbosity,
+                blockchainLogs: false,
+                vmLogs: 'none',
+                debugLogs: false,
+                print: false
+            };
 
         expect(receipt.transactions.length).toEqual(3);
         accountForGas(receipt.transactions);
@@ -162,8 +183,8 @@ describe('Wallet V5 extensions auth', () => {
 
         const actions = packActionsList([
             new ActionAddExtension(testOtherExtension),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg1),
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg2)
         ]);
 
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
@@ -291,7 +312,9 @@ describe('Wallet V5 extensions auth', () => {
 
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
 
-        const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+        const actions = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS, msg)
+        ]);
 
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
             value: toNano('0.1'),
@@ -318,5 +341,56 @@ describe('Wallet V5 extensions auth', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
+    });
+
+    it('Should replace message mode with mode | IGNORE_ERRORS flag', async () => {
+        await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body: createBody(packActionsList([new ActionAddExtension(sender.address!)]))
+        });
+
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actions
+        });
+
+        expect(receipt.transactions.length).toEqual(3);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const expectedOutList = beginCell_()
+            .store(
+                storeOutList([
+                    {
+                        type: 'sendMsg',
+                        mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                        outMsg: toAtTonCoreMsgInternal(msg)
+                    }
+                ])
+            )
+            .endCell();
+
+        expect(bufferToBigInt(expectedOutList.hash())).toEqual(
+            (receipt.transactions[1].description as TransactionDescriptionGeneric).actionPhase!
+                .actionListHash
+        );
+
+        const fee = receipt.transactions[2].totalFees.coins;
+
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 });

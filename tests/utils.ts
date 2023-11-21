@@ -1,4 +1,5 @@
 import { Address, beginCell, Cell, CurrencyCollection, MessageRelaxed, StateInit } from 'ton-core';
+import { Address as Address_, Cell as Cell_, MessageRelaxed as MessageRelaxed_ } from '@ton/core';
 
 export function bufferToBigInt(buffer: Buffer): bigint {
     return BigInt('0x' + buffer.toString('hex'));
@@ -36,6 +37,17 @@ export function createMsgInternal(params: {
         body: params.body || beginCell().endCell(),
         init: params.init
     };
+}
+
+export function toAtTonCoreMsgInternal(msg: MessageRelaxed): MessageRelaxed_ {
+    return {
+        info: {
+            ...msg.info,
+            dest: Address_.parse(msg.info.dest!.toString())
+        },
+        body: Cell_.fromBase64(msg.body.toBoc().toString('base64')),
+        init: msg.init
+    } as MessageRelaxed_;
 }
 
 export async function disableConsoleError(callback: () => Promise<void>): Promise<void> {
