@@ -1,0 +1,14 @@
+diff --git a/node_modules/jest-worker/build/workers/messageParent.js b/node_modules/jest-worker/build/workers/messageParent.js
+index 62e2cce..8d97e9c 100644
+--- a/node_modules/jest-worker/build/workers/messageParent.js
++++ b/node_modules/jest-worker/build/workers/messageParent.js
+@@ -20,6 +20,9 @@ var _types = require('../types');
+  */
+ 
+ function messageParent(message, parentProcess = process) {
++
++  BigInt.prototype.toJSON = function() { return this.toString() }
++
+   if (!_worker_threads().isMainThread && _worker_threads().parentPort != null) {
+     _worker_threads().parentPort.postMessage([
+       _types.PARENT_MESSAGE_CUSTOM,

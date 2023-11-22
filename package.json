@@ -7,11 +7,16 @@
         "build:v5": "blueprint build wallet_v5",
         "deploy-library": "npx blueprint run deployLibrary",
         "deploy-wallet": "blueprint run deployWalletV5",
+        "deploy-wallet-no-lib": "blueprint run deployWalletV5WithoutLibrary",
         "print-wallet-code": "ts-node ./scripts/printWalletCode.ts",
-        "test": "jest"
+        "test": "jest",
+        "scalpel": "bash ./scripts/scalpel.sh",
+        "pack-wasm": "ts-node ./scripts/pack-wasm.ts",
+        "postinstall": "patch-package"
     },
     "devDependencies": {
         "@ton-community/blueprint": "^0.12.0",
+        "@ton-community/func-js-bin": "0.4.4",
         "@ton-community/sandbox": "^0.11.0",
         "@ton-community/test-utils": "^0.3.0",
         "@types/jest": "^29.5.0",
@@ -31,6 +36,7 @@
         "eslint-config-prettier": "^8.5.0",
         "eslint-plugin-import": "^2.26.0",
         "eslint-plugin-prettier": "^4.2.1",
-        "eslint-plugin-unused-imports": "^2.0.0"
+        "eslint-plugin-unused-imports": "^2.0.0",
+        "patch-package": "^8.0.0"
     }
 }
