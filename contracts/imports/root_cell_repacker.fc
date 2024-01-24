@@ -1,0 +1,53 @@
+() __install_root_cell_repacker_hook__() impure asm """
+// Require the Fift Assembler version that this code is known to work with
+// (this version of FunC is required in the contract code anyway)
+"0.4.4" require-asm-fif-version
+// Install a hook that will execute in context of PROGRAM in the Fift assembler
+// The hook will redefine }END>c function in order to modify the resulting root cell
+@atend @ 1 { execute
+    // Replace current words dictionary with (Asm) context one to redefine }END>c word
+    current@ context@ current!
+    {
+        // Get the original root cell as the result of original program assembling
+        // by calling }END> that will return builder, and completing builder to cell
+        }END> b>
+        // Now the top entry on stack contains tha original root cell that constists of
+        // some boilerplate code and one and only reference to methods dictionary
+        <s ref@
+        // The above line extracts methods dictionary from the original root code cell
+        <{
+            // Here the stack contains root code cell builder as the top element
+            // and methods dictionary as the next (second) element
+            SETCP0 // Mandatory action for any contract to change codepage to 0
+            DUP // The copy of method_id will be 0 if method_id = 0
+            IFNOTJMP:<{
+                // This branch is executed only if method_id = 0 (internal messages)
+                DROP // Remove the second copy of method_id created for further decisions
+                over 0 swap @procdictkeylen idict@ // Extract recv_internal from methods dict
+                { "recv_internal is not defined" abort } ifnot // Fail if method is not found
+                @addop // Otherwise, if everything is OK, embed recv_internal into root code cell
+            }>
+            DUP INC // The copy of method_id+1 will be 0 if method_id = -1
+            IFNOTJMP:<{
+                // This branch is executed only if method_id = -1 (external messages)
+                DROP // Remove the second copy of method_id created for further decisions
+                over -1 swap @procdictkeylen idict@ // Extract recv_external from methods dict
+                { "recv_external is not defined" abort } ifnot // Fail if method is not found
+                @addop // Otherwise, if everything is OK, embed recv_external into root code cell
+            }>
+            // If the execution is at this moment, either this is internal method call (that are strictly
+            // discouraged if using root cell repacker) or a getter method (which's gas is not too relevant)
+            swap // Select methods dictionary for further operations (remove embedded recv_... methods)
+             0 swap @procdictkeylen idict- drop // remove recv_internal from methods dictionary
+            -1 swap @procdictkeylen idict- drop // remove recv_external from methods dictionary
+            @procdictkeylen DICTPUSHCONST DICTIGETJMPZ 11 THROWARG // add methods dictionary and call the (get-)method
+        }>
+        b>
+    }
+    // The words will be redefined in "current" dictionary that is actually Asm context
+    : }END>c
+    // Restore the current words dictionary to context and restore original current dict
+    current@ context! current!
+// Actually attach the hook installer to the end of current procedure definition
+} does @atend !
+""";

@@ -1,6 +1,7 @@
 #pragma version =0.4.4;
 
 #include "imports/stdlib.fc";
+#include "imports/root_cell_repacker.fc";
 
 ;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
 () slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
@@ -141,6 +142,9 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 }
 
 () recv_internal(cell full_msg, slice body) impure inline {
+
+  __install_root_cell_repacker_hook__(); ;; this function from root_cell_repacker can be called in any method
+
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
@@ -182,12 +186,6 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
 }
-
-;; N.B. If compiled by an compiler that does not support entry_point_recv this method will be ignored and the
-;; contract would compile, however the gas usage will be higher due to recv_internal/external not inlined in root
-
-;; Moved to separate file to make it easier to backport stuff from entrypoint branch to main branch
-#include "imports/entrypoint.fc";
 
 ;; Get methods
 
