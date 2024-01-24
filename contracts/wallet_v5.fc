@@ -247,6 +247,8 @@ cell verify_actions(cell c5) inline {
 
   __install_root_cell_repacker_hook__(); ;; this function from root_cell_repacker can be called in any method
 
+  return_if(body.slice_empty?()); ;; return right away if the body is empty (simple transfer)
+
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
