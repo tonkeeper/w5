@@ -21,7 +21,7 @@ const int size::flags = 4;
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
-(slice) check_and_remove_sign_prefix_or_ret(slice body) impure asm "x{7369676E} SDBEGINSQ" "IFNOTRET";
+(slice) check_and_remove_sint_prefix_or_ret(slice body) impure asm "x{73696E74} SDBEGINSQ" "IFNOTRET";
 
 ;; Extensible wallet contract v5
 
@@ -189,7 +189,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
   }
 
-  body = check_and_remove_sign_prefix_or_ret(body); ;; 0x7369676E ("sign")
+  body = check_and_remove_sint_prefix_or_ret(body); ;; 0x73696E74 ("sint") - sign internal
 
   ;; Process the rest of the slice just like the signed request.
   process_signed_request(body);

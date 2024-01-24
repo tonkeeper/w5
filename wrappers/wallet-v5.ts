@@ -37,7 +37,8 @@ export const Opcodes = {
     action_extended_add_extension: 0x1c40db9f,
     action_extended_remove_extension: 0x5eaef4a4,
     auth_extension: 0x6578746e,
-    auth_signed: 0x7369676e
+    auth_signed: 0x7369676e,
+    auth_signed_internal: 0x73696e74
 };
 
 export class WalletId {
@@ -136,7 +137,7 @@ export class WalletV5 implements Contract {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Opcodes.auth_signed, 32)
+                .storeUint(Opcodes.auth_signed_internal, 32)
                 .storeSlice(opts.body.beginParse())
                 .endCell()
         });
