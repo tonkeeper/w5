@@ -3,6 +3,16 @@
 #include "imports/stdlib.fc";
 #include "imports/root_cell_repacker.fc";
 
+const int size::stored_seqno = 33;
+const int size::stored_subwallet = 80;
+const int size::public_key = 256;
+
+const int size::subwallet_id = 80;
+const int size::valid_until = 32;
+const int size::msg_seqno = 32;
+
+const int size::flags = 4;
+
 ;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
 () slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
 
@@ -51,7 +61,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
       int packed_addr = pack_address((wc, hash) );
 
       var ds = get_data().begin_parse();
-      var data_bits = ds~load_bits(32 + 80 + 256);
+      var data_bits = ds~load_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
       var extensions = ds.preload_dict();
 
       ;; Add extension
@@ -103,13 +113,13 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   var signature = body~load_bits(512);
 
   var cs = body;
-  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(80), cs~load_uint(32), cs~load_uint(32));
+  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
 
   var ds = get_data().begin_parse();
-  var stored_seqno = ds~load_uint(32);
+  var stored_seqno = ds~load_int(size::stored_seqno);
   var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  var stored_subwallet = ds~load_uint(80);
-  var public_key = ds.preload_uint(256);
+  var stored_subwallet = ds~load_uint(size::stored_subwallet);
+  var public_key = ds.preload_uint(size::public_key);
 
   ;; Only such checking order results in least amount of gas
   throw_unless(35, check_signature(slice_hash(body), signature, public_key));
@@ -122,7 +132,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
-          .store_uint(stored_seqno, 32)
+          .store_int(stored_seqno, size::stored_seqno)
           .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
           .end_cell());
 
@@ -148,7 +158,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
 
-  var s_flags = full_msg_slice~load_bits(4); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  var s_flags = full_msg_slice~load_bits(size::flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
   slicy_return_if_bounce(s_flags);
 
   ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
@@ -167,7 +177,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
-    var extensions = ds.skip_bits(32 + 80 + 256).preload_dict();
+    var extensions = ds.skip_bits(size::stored_seqno + size::stored_subwallet + size::public_key).preload_dict();
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
@@ -190,21 +200,25 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 ;; Get methods
 
 int seqno() method_id {
-  return get_data().begin_parse().preload_uint(32);
+  return get_data().begin_parse().preload_int(size::stored_seqno);
 }
 
 int get_wallet_id() method_id {
-  return get_data().begin_parse().skip_bits(32).preload_uint(80);
+  return get_data().begin_parse().skip_bits(size::stored_seqno).preload_uint(size::stored_subwallet);
 }
 
 int get_public_key() method_id {
-  var cs = get_data().begin_parse().skip_bits(32 + 80);
-  return cs.preload_uint(256);
+  var cs = get_data().begin_parse().skip_bits(size::stored_seqno + size::stored_subwallet);
+  return cs.preload_uint(size::public_key);
 }
 
 ;; Returns raw dictionary (or null if empty) where keys are packed addresses and the `wc` is stored in leafs.
 ;; User should unpack the address using the same packing function using `wc` to restore the original address.
 cell get_extensions() method_id {
-  var ds = get_data().begin_parse().skip_bits(32 + 80 + 256);
+  var ds = get_data().begin_parse().skip_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
   return ds~load_dict();
+}
+
+int is_public_key_enabled() method_id {
+  return get_data().begin_parse().preload_int(size::stored_seqno) > 0;
 }

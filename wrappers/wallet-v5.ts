@@ -23,7 +23,7 @@ export type WalletV5Config = {
 
 export function walletV5ConfigToCell(config: WalletV5Config): Cell {
     return beginCell()
-        .storeUint(config.seqno, 32)
+        .storeInt(config.seqno, 33)
         .storeUint(config.walletId, 80)
         .storeBuffer(config.publicKey, 32)
         .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))

@@ -331,7 +331,7 @@ describe('Wallet V5 sign auth internal', () => {
         const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue2 });
 
         const actionsList = packActionsList([
-            new ActionSetData(beginCell().storeUint(239, 32).endCell()),
+            new ActionSetData(beginCell().storeInt(239, 33).endCell()),
             new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
             new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
         ]);
@@ -383,7 +383,7 @@ describe('Wallet V5 sign auth internal', () => {
         );
 
         const actionsList = packActionsList([
-            new ActionSetData(beginCell().storeUint(239, 32).endCell()),
+            new ActionSetData(beginCell().storeInt(239, 33).endCell()),
             ...msges.map(msg => new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg))
         ]);
 
