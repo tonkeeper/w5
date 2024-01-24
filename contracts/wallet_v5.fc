@@ -149,8 +149,8 @@ cell verify_actions(cell c5) inline {
 }
 
 () dispatch_extension_request(slice cs, var dummy1) impure inline {
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
-  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref().verify_actions()); return (); }
+  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
   ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
   dispatch_complex_request_iref(cs);
@@ -172,6 +172,10 @@ cell verify_actions(cell c5) inline {
 
   ;; Only such checking order results in least amount of gas
   throw_unless(35, check_signature(slice_hash(body), signature, public_key));
+  ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
+  ;; However, msg_seqno is uint, therefore it can be only greater or equal to zero: msg_seqno >= 0
+  ;; Thus, if public key is disabled, these two domains NEVER intersect, and additional check is not needed
+  ;; throw_if(33, stored_seqno < 0);
   throw_unless(33, msg_seqno == stored_seqno);
   throw_unless(34, subwallet_id == stored_subwallet);
   throw_if(36, valid_until <= now());
@@ -187,15 +191,16 @@ cell verify_actions(cell c5) inline {
 
   commit();
 
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref()); return (); }
-  ;; <<<<<<<<<<---------- CONTEST TEST CUTOFF POINT ---------->>>>>>>>>>
+  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref().verify_actions()); return (); }
+  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
 
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
   dispatch_complex_request_iref(cs);
 }
 
 () recv_external(slice body) impure inline {
-  body = enforce_and_remove_sign_prefix(body); ;; 0x7369676E ("sign")
+  ;; 0x7369676E ("sign") external message authenticated by signature
+  body = enforce_and_remove_sign_prefix(body);
   process_signed_request(body);
   return();
 }
@@ -214,11 +219,11 @@ cell verify_actions(cell c5) inline {
 
   ;; We accept two kinds of authenticated messages:
   ;; - 0x6578746E "extn" authenticated by extension
-  ;; - 0x7369676E "sign" authenticated by signature
+  ;; - 0x73696E74 "sint" internal message authenticated by signature
 
   (body, int is_extn) = check_and_remove_extn_prefix(body); ;; 0x6578746E ("extn")
 
-  ;; IFJMPREF
+  ;; IFJMPREF because unconditionally returns inside
   if (is_extn) { ;; "extn" authenticated by extension
 
     ;; Authenticate extension by its address.
