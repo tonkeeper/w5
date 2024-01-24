@@ -15,6 +15,7 @@ const int size::flags = 4;
 
 ;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
 () slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
+() slicy_throw_if_ends_with_0(slice s) impure asm "SDCNTTRAIL0" "37 THROWIF";
 
 (slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET IFNOTRET";
 
@@ -22,6 +23,12 @@ const int size::flags = 4;
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
 (slice) check_and_remove_sint_prefix_or_ret(slice body) impure asm "x{73696E74} SDBEGINSQ" "IFNOTRET";
+
+(slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
+(slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
+(slice, int) check_and_remove_set_public_key_enabled_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
+
+(slice) enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
 ;; Extensible wallet contract v5
 
@@ -35,21 +42,32 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 
 {-
   ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref());
+    set_actions(cs.preload_ref().verify_actions());
     return ();
   }
 -}
-() set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF c5 POP }>" "DROP";
+() set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF verify_actions INLINECALLDICT c5 POP }>" "DROP";
+
+cell verify_actions(cell c5) inline {
+  slice c5s = c5.begin_parse();
+  while (~ c5s.slice_empty?()) {
+    ;; only send_msg is allowed, set_code or reserve_currency are not
+    c5s = c5s.enforce_and_remove_action_send_msg_prefix();
+    ;; enforce that send_mode has 2 bit set
+    ;; for that load 7 bits and make sure that they end with 1
+    slicy_throw_if_ends_with_0(c5s.preload_bits(7));
+    c5s = c5s.preload_ref().begin_parse();
+  }
+  return c5;
+}
 
 ;; Dispatches already authenticated request.
 () dispatch_complex_request_inline(slice cs) impure inline {
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_uint(1)) {
-    int op = cs~load_uint(32);
-
-    var is_add_ext = (op == 0x1c40db9f);
-    var is_del_ext = (op == 0x5eaef4a4);
+    var is_add_ext = cs~check_and_remove_add_extension_prefix();
+    var is_del_ext = cs~check_and_remove_remove_extension_prefix();
     ;; Add/remove extensions
     if ((is_add_ext) | (is_del_ext)) {
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
@@ -64,8 +82,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
         (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
         throw_unless(39, success?);
       } else
-      ;; Remove extension
-      ;; if (op == 0x5eaef4a4)
+      ;; Remove extension if (op == 0x5eaef4a4)
       ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
       {
         (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
@@ -78,13 +95,33 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
               .end_cell());
     }
 
+    if (cs~check_and_remove_set_public_key_enabled_prefix()) {
+      var enable = cs~load_uint(1);
+      var ds = get_data().begin_parse();
+      var stored_seqno = ds~load_int(size::stored_seqno);
+      var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+      if (enable) {
+        if (stored_seqno <= 0) {
+          stored_seqno = (- stored_seqno) + 1;
+        }
+      } else {
+        if (stored_seqno >= 0) {
+          stored_seqno = - (stored_seqno + 1);
+        }
+      }
+      set_data(begin_cell()
+        .store_int(stored_seqno, size::stored_seqno)
+        .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
+        .end_cell());
+    }
+
     ;; Other actions are no-op
     ;; FIXME: is it costlier to check for unsupported actions and throw?
     cs = cs.preload_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions:
-  set_actions(cs.preload_ref());
+  set_actions(cs.preload_ref().verify_actions());
   return ();
 }
 

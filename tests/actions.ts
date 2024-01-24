@@ -21,7 +21,7 @@ export class ActionSendMsg {
     public serialize(): Cell {
         return beginCell()
             .storeUint(this.tag, 32)
-            .storeUint(this.mode, 8)
+            .storeUint(this.mode | SendMode.IGNORE_ERRORS, 8)
             .storeRef(beginCell().store(storeMessageRelaxed(this.outMsg)).endCell())
             .endCell();
     }

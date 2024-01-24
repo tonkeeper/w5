@@ -36,6 +36,7 @@ export const Opcodes = {
     action_extended_set_data: 0x1ff8ea0b,
     action_extended_add_extension: 0x1c40db9f,
     action_extended_remove_extension: 0x5eaef4a4,
+    action_extended_set_public_key_enabled: 0x20cbb95a,
     auth_extension: 0x6578746e,
     auth_signed: 0x7369676e,
     auth_signed_internal: 0x73696e74

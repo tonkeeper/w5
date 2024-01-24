@@ -137,7 +137,7 @@ describe('Wallet V5 sign auth external', () => {
 
         const sendTxactionAction = beginCell()
             .storeUint(Opcodes.action_send_msg, 32)
-            .storeInt(SendMode.PAY_GAS_SEPARATELY, 8)
+            .storeInt(SendMode.PAY_GAS_SEPARATELY | SendMode.IGNORE_ERRORS, 8)
             .storeRef(sendTxMsg)
             .endCell();
 
