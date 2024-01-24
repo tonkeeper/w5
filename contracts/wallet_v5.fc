@@ -13,6 +13,8 @@ const int size::msg_seqno = 32;
 
 const int size::flags = 4;
 
+() return_if(int cond) impure asm "IFRET";
+
 ;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
 () slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
 () slicy_throw_if_ends_with_0(slice s) impure asm "SDCNTTRAIL0" "37 THROWIF";
@@ -53,14 +55,15 @@ cell verify_actions(cell c5) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
   ;; {-
   slice c5s = c5.begin_parse();
-  while (~ c5s.slice_empty?()) {
+  return_if(c5s.slice_empty?());
+  do {
     ;; only send_msg is allowed, set_code or reserve_currency are not
     c5s = c5s.enforce_and_remove_action_send_msg_prefix();
     ;; enforce that send_mode has 2 bit set
     ;; for that load 7 bits and make sure that they end with 1
     slicy_throw_if_ends_with_0(c5s.preload_bits(7));
     c5s = c5s.preload_ref().begin_parse();
-  }
+  } until (c5s.slice_empty?());
   ;; -}
   return c5;
 }
