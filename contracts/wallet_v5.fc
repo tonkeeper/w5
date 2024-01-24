@@ -24,6 +24,7 @@ const int size::flags = 4;
 
 (slice) check_and_remove_sint_prefix_or_ret(slice body) impure asm "x{73696E74} SDBEGINSQ" "IFNOTRET";
 
+(slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
 (slice, int) check_and_remove_set_public_key_enabled_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
@@ -49,6 +50,8 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 () set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF verify_actions INLINECALLDICT c5 POP }>" "DROP";
 
 cell verify_actions(cell c5) inline {
+  ;; Comment out code starting from here to disable checks (unsafe version)
+  ;; {-
   slice c5s = c5.begin_parse();
   while (~ c5s.slice_empty?()) {
     ;; only send_msg is allowed, set_code or reserve_currency are not
@@ -58,6 +61,7 @@ cell verify_actions(cell c5) inline {
     slicy_throw_if_ends_with_0(c5s.preload_bits(7));
     c5s = c5s.preload_ref().begin_parse();
   }
+  ;; -}
   return c5;
 }
 
@@ -94,8 +98,7 @@ cell verify_actions(cell c5) inline {
               .store_dict(extensions)
               .end_cell());
     }
-
-    if (cs~check_and_remove_set_public_key_enabled_prefix()) {
+    elseif (cs~check_and_remove_set_public_key_enabled_prefix()) {
       var enable = cs~load_uint(1);
       var ds = get_data().begin_parse();
       var stored_seqno = ds~load_int(size::stored_seqno);
@@ -114,13 +117,18 @@ cell verify_actions(cell c5) inline {
         .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
         .end_cell());
     }
-
+    ;; Uncomment to allow set_data (for unsafe version)
+    {-
+    elseif (cs~check_and_remove_set_data_prefix()) {
+      set_data(cs~load_ref());
+    }
+    -}
     ;; Other actions are no-op
     ;; FIXME: is it costlier to check for unsupported actions and throw?
     cs = cs.preload_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
-  ;; Simply set the C5 register with all pre-computed actions:
+  ;; Simply set the C5 register with all pre-computed actions after verification:
   set_actions(cs.preload_ref().verify_actions());
   return ();
 }
