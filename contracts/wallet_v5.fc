@@ -48,11 +48,6 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
   while (cs~load_uint(1)) {
     int op = cs~load_uint(32);
 
-    ;; Raw set_data
-    if (op == 0x1ff8ea0b) {
-      set_data(cs~load_ref());
-    }
-
     var is_add_ext = (op == 0x1c40db9f);
     var is_del_ext = (op == 0x5eaef4a4);
     ;; Add/remove extensions

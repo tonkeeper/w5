@@ -9,11 +9,8 @@ import {
     ActionAddExtension,
     ActionRemoveExtension,
     ActionSendMsg,
-    ActionSetCode,
-    ActionSetData,
     packActionsList
 } from './actions';
-import { WalletV4 } from '../wrappers/wallet-v4';
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
@@ -317,6 +314,7 @@ describe('Wallet V5 sign auth internal', () => {
         );
     });
 
+    /* TODO: Rewrite as a negative test
     it('Set data and do two transfers', async () => {
         const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue1 = toNano(0.001);
@@ -367,7 +365,9 @@ describe('Wallet V5 sign auth internal', () => {
         const storedSeqno = await walletV5.getSeqno();
         expect(storedSeqno).toEqual(239);
     });
+    */
 
+    /* TODO: Rewrite as a negative test
     it('Send 255 transfers and do set data', async () => {
         const range = [...new Array(255)].map((_, index) => index);
 
@@ -416,6 +416,7 @@ describe('Wallet V5 sign auth internal', () => {
         const storedSeqno = await walletV5.getSeqno();
         expect(storedSeqno).toEqual(239);
     });
+    */
 
     it('Remove extension', async () => {
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
@@ -453,6 +454,7 @@ describe('Wallet V5 sign auth internal', () => {
         accountForGas(receipt2.transactions);
     });
 
+    /* TODO: Rewrite as a negative test
     it('Change code and data to wallet v4', async () => {
         const code_v4 = await compile('wallet_v4');
         const data_v4 = beginCell()
@@ -525,6 +527,7 @@ describe('Wallet V5 sign auth internal', () => {
             value: forwardValue
         });
     });
+    */
 
     it('Should fail adding existing extension', async () => {
         const testExtension = Address.parseRaw('0:' + '0'.repeat(64));
