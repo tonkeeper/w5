@@ -97,7 +97,13 @@ You need to put two requests in your message body:
 
 Yes. We have considered constant-size schemes where the wallet only stores trusted extension code. However, extension authentication becomes combursome and expensive: plugin needs to transmit additional data and each request needs to recompute plugin’s address. We estimate that for the reasonably sized wallets (less than 100 plugins) authentication via the dictionary lookup would not exceed costs of indirect address authentication.
 
-### Why it can be useful to disable signature authentication?
+### Why it can be useful to disable signature authentication mode?
+
+Ability to disable authentication by signature enables two related use-cases:
+
+1. Two-factor authentication schemes: where control over wallet is fully delegated to an extension that checks two signatures: the user’s one and the signature from the auth service. Naturally, if the signature authentication in the wallet remains enabled, the second factor check is bypassed.
+
+2. Account recovery: delegating full control to another wallet in case of key compromise or loss. Wallet may contain larger amount of assets and its address could be tied to long-term contracts, therefore delegation to another controlling account is preferred to simply transferring the assets.
 
 ### What is library on masterchain?
 
