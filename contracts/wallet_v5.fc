@@ -30,7 +30,7 @@ const int size::flags = 4;
 (slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
-(slice, int) check_and_remove_set_public_key_enabled_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
+(slice, int) check_and_remove_set_signature_auth_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
 
 (slice) enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
@@ -50,7 +50,15 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
     return ();
   }
 -}
-() set_actions_if_simple(slice cs) impure asm "x{4_} SDBEGINSQ" "IFJMP:<{ PLDREF verify_actions INLINECALLDICT c5 POP }>" "DROP";
+() set_actions_if_simple(slice cs) impure asm """
+  x{4_} SDBEGINSQ
+  IFJMP:<{
+    PLDREF
+    verify_actions INLINECALLDICT
+    c5 POP
+  }>
+  DROP
+""";
 
 cell verify_actions(cell c5) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
@@ -104,12 +112,13 @@ cell verify_actions(cell c5) inline {
               .store_dict(extensions)
               .end_cell());
     }
-    elseif (cs~check_and_remove_set_public_key_enabled_prefix()) {
-      var enable = cs~load_uint(1);
+    elseif (cs~check_and_remove_set_signature_auth_allowed_prefix()) {
+      var allow = cs~load_uint(1);
       var ds = get_data().begin_parse();
       var stored_seqno = ds~load_int(size::stored_seqno);
       var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-      if (enable) {
+      if (allow) {
+        ;; allow
         if (stored_seqno < 0) {
           ;; Can't be disabled with 0 because disabling increments seqno
           ;; -123 -> 123 -> 124
@@ -117,7 +126,11 @@ cell verify_actions(cell c5) inline {
           stored_seqno = stored_seqno + 1;
         }
       } else {
+        ;; disallow
         if (stored_seqno >= 0) {
+          ds = ds.skip_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
+          var extensions_is_not_null = ds.preload_uint(1);
+          throw_unless(42, extensions_is_not_null);
           ;; Corner case: 0 -> 1 -> -1
           ;; 123 -> 124 -> -124
           stored_seqno = stored_seqno + 1;
@@ -245,9 +258,13 @@ cell verify_actions(cell c5) inline {
 
 () recv_internal(cell full_msg, slice body) impure inline {
 
-  __install_root_cell_repacker_hook__(); ;; this function from root_cell_repacker can be called in any method
+  ;; this function from root_cell_repacker can be called in any method
+  ;; no opcodes are added by this function to recv_internal directly
+  __install_root_cell_repacker_hook__();
 
-  return_if(body.slice_empty?()); ;; return right away if the body is empty (simple transfer)
+  ;; return right away if there are no references
+  ;; correct messages always have a ref, because any code paths ends with preload_ref
+  return_if(body.slice_refs_empty?());
 
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
   var full_msg_slice = full_msg.begin_parse();
@@ -294,6 +311,7 @@ cell verify_actions(cell c5) inline {
 ;; Get methods
 
 int seqno() method_id {
+  ;; Use absolute value to do not confuse apps with negative seqno if key is disabled
   return abs(get_data().begin_parse().preload_int(size::stored_seqno));
 }
 
@@ -313,6 +331,6 @@ cell get_extensions() method_id {
   return ds~load_dict();
 }
 
-int is_public_key_enabled() method_id {
+int get_is_signature_auth_allowed() method_id {
   return get_data().begin_parse().preload_int(size::stored_seqno) >= 0;
 }
