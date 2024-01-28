@@ -1,7 +1,6 @@
 #pragma version =0.4.4;
 
 #include "imports/stdlib.fc";
-#include "imports/root_cell_repacker.fc";
 
 const int size::stored_seqno = 33;
 const int size::stored_subwallet = 80;
@@ -27,7 +26,7 @@ const int size::flags = 4;
 
 (slice) check_and_remove_sint_prefix_or_ret(slice body) impure asm "x{73696E74} SDBEGINSQ" "IFNOTRET";
 
-(slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
+;; (slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_auth_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
@@ -44,21 +43,7 @@ int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
-{-
-  ifnot (cs.preload_uint(1)) {
-    set_actions(cs.preload_ref().verify_actions());
-    return ();
-  }
--}
-() set_actions_if_simple(slice cs) impure asm """
-  x{4_} SDBEGINSQ
-  IFJMP:<{
-    PLDREF
-    verify_actions INLINECALLDICT
-    c5 POP
-  }>
-  DROP
-""";
+int count_leading_zeroes(slice cs) asm "SDCNTLEAD0";
 
 cell verify_actions(cell c5) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
@@ -159,7 +144,9 @@ cell verify_actions(cell c5) inline {
 }
 
 () dispatch_extension_request(slice cs, var dummy1) impure inline {
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref().verify_actions()); return (); }
+  if (count_leading_zeroes(cs)) { ;; starts with bit 0
+    return set_actions(cs.preload_ref().verify_actions());
+  }
   ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
   ;;
   dummy1~impure_touch(); ;; DROP merged to 2DROP!
@@ -200,7 +187,9 @@ cell verify_actions(cell c5) inline {
 
   commit();
 
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref().verify_actions()); return (); }
+  if (count_leading_zeroes(cs)) { ;; starts with bit 0
+    return set_actions(cs.preload_ref().verify_actions());
+  }
   ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
 
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
@@ -242,7 +231,9 @@ cell verify_actions(cell c5) inline {
 
   commit();
 
-  set_actions_if_simple(cs); ;; <- ifnot (cs.preload_uint(1)) { set_actions(cs.preload_ref().verify_actions()); return (); }
+  if (count_leading_zeroes(cs)) { ;; starts with bit 0
+    return set_actions(cs.preload_ref().verify_actions());
+  }
   ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
 
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
@@ -257,10 +248,6 @@ cell verify_actions(cell c5) inline {
 }
 
 () recv_internal(cell full_msg, slice body) impure inline {
-
-  ;; this function from root_cell_repacker can be called in any method
-  ;; no opcodes are added by this function to recv_internal directly
-  __install_root_cell_repacker_hook__();
 
   ;; return right away if there are no references
   ;; correct messages always have a ref, because any code paths ends with preload_ref
