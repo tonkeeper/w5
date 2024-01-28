@@ -676,6 +676,13 @@ describe('Wallet V5 sign auth internal', () => {
             value: toNano(0.1),
             body
         });
+        console.debug(
+            'SINGLE WRONG SIGNATURE INTERNAL TRANSFER GAS USED:',
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).gasUsed
+        );
 
         expect(
             (
@@ -906,5 +913,38 @@ describe('Wallet V5 sign auth internal', () => {
                     .computePhase as TransactionComputeVm
             ).exitCode
         ).toEqual(0);
+
+        console.debug(
+            'SINGLE SIMPLE INTERNAL TRANSFER GAS USED:',
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).gasUsed
+        );
+    });
+
+    it('Should skip message with longer text comment', async () => {
+        const receipt = await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: beginCell().storeUint(0, 32).storeStringTail('Hello world'.repeat(20)).endCell()
+        });
+
+        expect(receipt.transactions.length).toEqual(2);
+
+        expect(
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(0);
+
+        console.debug(
+            'SINGLE LONGER SIMPLE INTERNAL TRANSFER GAS USED:',
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).gasUsed
+        );
     });
 });
