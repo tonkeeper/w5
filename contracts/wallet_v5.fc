@@ -15,16 +15,11 @@ const int size::flags = 4;
 () return_if(int cond) impure asm "IFRET";
 () return_unless(int cond) impure asm "IFNOTRET";
 
-;; SDCNTTRAIL1 will count trailing ones in slice. If bounced flag (last bit) is set it will be non-zero, else zero.
-() slicy_return_if_bounce(slice s_flags) impure asm "SDCNTTRAIL1" "IFRET";
-() slicy_throw_if_ends_with_0(slice s) impure asm "SDCNTTRAIL0" "37 THROWIF";
-
-(slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET IFNOTRET";
+(slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET" "IFNOTRET";
 
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
-
-(slice) check_and_remove_sint_prefix_or_ret(slice body) impure asm "x{73696E74} SDBEGINSQ" "IFNOTRET";
+(slice, int) check_and_remove_sint_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
 
 ;; (slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
@@ -38,12 +33,14 @@ const int size::flags = 4;
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
 ;; This allows us to save on wrapping the address in a cell and make plugin requests cheaper.
 ;; This method also unpacks address hash if you pass packed hash with the original wc.
-int pack_address((int, int) address) impure asm "SWAP INC XOR"; ;; hash ^ (wc+1)
+int pack_address((int, int) address) impure asm "SWAP" "INC" "XOR"; ;; hash ^ (wc+1)
 
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
 int count_leading_zeroes(slice cs) asm "SDCNTLEAD0";
+int count_trailing_zeroes(slice cs) asm "SDCNTTRAIL0";
+int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
 
 cell verify_actions(cell c5) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
@@ -55,7 +52,7 @@ cell verify_actions(cell c5) inline {
     c5s = c5s.enforce_and_remove_action_send_msg_prefix();
     ;; enforce that send_mode has 2 bit set
     ;; for that load 7 bits and make sure that they end with 1
-    slicy_throw_if_ends_with_0(c5s.preload_bits(7));
+    throw_if(37, count_trailing_zeroes(c5s.preload_bits(7)));
     c5s = c5s.preload_ref().begin_parse();
   } until (c5s.slice_empty?());
   ;; -}
@@ -257,7 +254,9 @@ cell verify_actions(cell c5) inline {
   var full_msg_slice = full_msg.begin_parse();
 
   var s_flags = full_msg_slice~load_bits(size::flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
-  slicy_return_if_bounce(s_flags);
+
+  ;; If bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
+  return_if(count_trailing_ones(s_flags));
 
   ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
 
@@ -287,7 +286,8 @@ cell verify_actions(cell c5) inline {
 
   }
 
-  body = check_and_remove_sint_prefix_or_ret(body); ;; 0x73696E74 ("sint") - sign internal
+  (body, int is_sint) = check_and_remove_sint_prefix(body); ;; 0x73696E74 ("sint") - sign internal
+  return_unless(is_sint);
 
   ;; Process the rest of the slice just like the signed request.
   process_signed_request_from_internal_message(body);
