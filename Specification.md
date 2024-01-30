@@ -165,9 +165,10 @@ Authentication modes:
 ```tl-b
 signed_request$_ 
   signature:    bits512                   // 512
-  wallet_id:    (## 80)                   // 512+80
-  valid_until:  (## 32)                   // 512+80+32
-  msg_seqno:    (## 32)                   // 512+80+32+32 = 656
+  is_external:  (## 1)                    // 512+1
+  wallet_id:    (## 80)                   // 512+1+80
+  valid_until:  (## 32)                   // 512+1+80+32
+  msg_seqno:    (## 32)                   // 512+1+80+32+32 = 657
   inner: InnerRequest = SignedRequest;
 
 internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;

@@ -140,22 +140,15 @@ cell verify_actions(cell c5) inline {
   return ();
 }
 
-() dispatch_extension_request(slice cs, var dummy1) impure inline {
-  if (count_leading_zeroes(cs)) { ;; starts with bit 0
-    return set_actions(cs.preload_ref().verify_actions());
-  }
-  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
-  ;;
-  dummy1~impure_touch(); ;; DROP merged to 2DROP!
-  dispatch_complex_request(cs);
-}
+;; ------------------------------------------------------------------------------------------------
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice body) impure inline {
+() process_signed_request_from_external_message(slice body) impure inline {
   ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
   var signature = body~load_bits(512);
 
   var cs = body;
+  throw_unless(38, cs~load_uint(1)); ;; signed external messages must begin with 1 prefix
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
 
   var ds = get_data().begin_parse();
@@ -193,15 +186,35 @@ cell verify_actions(cell c5) inline {
   dispatch_complex_request(cs);
 }
 
+() recv_external(slice body) impure inline {
+  ;; 0x7369676E ("sign") external message authenticated by signature
+  body = enforce_and_remove_sign_prefix(body);
+  process_signed_request_from_external_message(body);
+  return();
+}
+
+;; ------------------------------------------------------------------------------------------------
+
+() dispatch_extension_request(slice cs, var dummy1) impure inline {
+  if (count_leading_zeroes(cs)) { ;; starts with bit 0
+    return set_actions(cs.preload_ref().verify_actions());
+  }
+  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
+  ;;
+  dummy1~impure_touch(); ;; DROP merged to 2DROP!
+  dispatch_complex_request(cs);
+}
+
 ;; Same logic as above function but with return_* instead of throw_* and additional checks to prevent bounces
 () process_signed_request_from_internal_message(slice body) impure inline {
   ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-  return_if(body.slice_bits() < 512 + size::subwallet_id + size::valid_until + size::msg_seqno + 1);
+  return_if(body.slice_bits() < 512 + 1 + size::subwallet_id + size::valid_until + size::msg_seqno + 1);
 
   ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
   var signature = body~load_bits(512);
 
   var cs = body;
+  return_if(cs~load_uint(1)); ;; signed internal messages must begin with 0 prefix
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
 
   var ds = get_data().begin_parse();
@@ -235,13 +248,6 @@ cell verify_actions(cell c5) inline {
 
   ;; inline_ref required because otherwise it will produce undesirable JMPREF
   dispatch_complex_request(cs);
-}
-
-() recv_external(slice body) impure inline {
-  ;; 0x7369676E ("sign") external message authenticated by signature
-  body = enforce_and_remove_sign_prefix(body);
-  process_signed_request(body);
-  return();
 }
 
 () recv_internal(cell full_msg, slice body) impure inline {
@@ -295,6 +301,7 @@ cell verify_actions(cell c5) inline {
 
 }
 
+;; ------------------------------------------------------------------------------------------------
 ;; Get methods
 
 int seqno() method_id {
