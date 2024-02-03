@@ -74,7 +74,7 @@ describe('Wallet V5 sign auth external', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(1, 1)
+            .storeUint(0x7369676e, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno

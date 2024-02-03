@@ -28,6 +28,9 @@ const int size::flags = 4;
 
 (slice) enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
+(slice, int) check_and_remove_internal_signed_prefix(slice body) impure asm "x{73696e74} SDBEGINSQ";
+(slice, int) check_and_remove_external_signed_prefix(slice body) impure asm "x{7369676e} SDBEGINSQ";
+
 ;; Extensible wallet contract v5
 
 ;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
@@ -148,7 +151,7 @@ cell verify_actions(cell c5) inline {
   var signature = body~load_bits(512);
 
   var cs = body;
-  throw_unless(38, cs~load_uint(1)); ;; signed external messages must begin with 1 prefix
+  throw_unless(38, cs~check_and_remove_external_signed_prefix());
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
 
   var ds = get_data().begin_parse();
@@ -208,13 +211,13 @@ cell verify_actions(cell c5) inline {
 ;; Same logic as above function but with return_* instead of throw_* and additional checks to prevent bounces
 () process_signed_request_from_internal_message(slice body) impure inline {
   ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-  return_if(body.slice_bits() < 512 + 1 + size::subwallet_id + size::valid_until + size::msg_seqno + 1);
+  return_if(body.slice_bits() < 512 + 32 + size::subwallet_id + size::valid_until + size::msg_seqno + 1);
 
   ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
   var signature = body~load_bits(512);
 
   var cs = body;
-  return_if(cs~load_uint(1)); ;; signed internal messages must begin with 0 prefix
+  return_unless(cs~check_and_remove_internal_signed_prefix());
   var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
 
   var ds = get_data().begin_parse();

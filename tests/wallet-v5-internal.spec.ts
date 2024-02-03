@@ -68,7 +68,7 @@ describe('Wallet V5 sign auth internal', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(0, 1)
+            .storeUint(0x73696e74, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
@@ -659,7 +659,7 @@ describe('Wallet V5 sign auth internal', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-            .storeUint(0, 1)
+            .storeUint(0x73696e74, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
