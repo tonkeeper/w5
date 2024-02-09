@@ -163,13 +163,13 @@ action_set_signature_auth_allowed#20cbb95a allowed:(## 1) = ExtendedAction;
 Authentication modes:
 
 ```tl-b
-signed_request$_ 
-  signature:    bits512                   // 512
-  request_type: (## 32)                   // 512+32
-  wallet_id:    (## 80)                   // 512+32+80
-  valid_until:  (## 32)                   // 512+32+80+32
-  msg_seqno:    (## 32)                   // 512+32+80+32+32 = 688
-  inner: InnerRequest = SignedRequest;
+signed_request$_             // 32 (opcode from outer)
+  wallet_id:    WalletID     // 80
+  valid_until:  #            // 32
+  msg_seqno:    #            // 32
+  inner:        InnerRequest // 1 .. (1 + 32 + 256) + ^Cell
+  signature:    bits512      // 512
+= SignedRequest;             // Total: 688 .. 976 + ^Cell
 
 internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;
 internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
@@ -180,7 +180,7 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 
 Contract state:
 ```tl-b
-wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:(## 32) = WalletID;
+wallet_id$_ global_id:# wc:int8 version:(## 8) subwallet_number:# = WalletID;
 contract_state$_ seqno:int33 wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
 ```
 

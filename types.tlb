@@ -11,13 +11,13 @@ action_add_ext#1c40db9f addr:MsgAddressInt = ExtendedAction;
 action_delete_ext#5eaef4a4 addr:MsgAddressInt = ExtendedAction;
 action_set_signature_auth_allowed#20cbb95a allowed:(## 1) = ExtendedAction;
 
-signed_request$_
-  signature:    bits512                   // 512
-  request_type: (## 32)                   // 512+32
-  wallet_id:    (## 80)                   // 512+32+80
-  valid_until:  (## 32)                   // 512+32+80+32
-  msg_seqno:    (## 32)                   // 512+32+80+32+32 = 688
-  inner: InnerRequest = SignedRequest;
+signed_request$_             // 32 (opcode from outer)
+  wallet_id:    WalletID     // 80
+  valid_until:  #            // 32
+  msg_seqno:    #            // 32
+  inner:        InnerRequest // 1 .. (1 + 32 + 256) + ^Cell
+  signature:    bits512      // 512
+= SignedRequest;             // Total: 688 .. 976 + ^Cell
 
 internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;
 internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
