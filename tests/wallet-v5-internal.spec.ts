@@ -608,6 +608,7 @@ describe('Wallet V5 sign auth internal', () => {
         const vu = validUntil();
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(vu, 32)
             .storeUint(seqno, 32) // seqno
@@ -623,8 +624,8 @@ describe('Wallet V5 sign auth internal', () => {
 
         const signature = sign(fakePayload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
@@ -713,7 +714,7 @@ describe('Wallet V5 sign auth internal', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
-
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno + 1, 32) // seqno
@@ -722,8 +723,8 @@ describe('Wallet V5 sign auth internal', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
@@ -758,6 +759,7 @@ describe('Wallet V5 sign auth internal', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(Math.round(Date.now() / 1000) - 600, 32)
             .storeUint(seqno, 32)
@@ -766,8 +768,8 @@ describe('Wallet V5 sign auth internal', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {
@@ -802,6 +804,7 @@ describe('Wallet V5 sign auth internal', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
@@ -810,8 +813,8 @@ describe('Wallet V5 sign auth internal', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         const receipt = await walletV5.sendInternalSignedMessage(sender, {

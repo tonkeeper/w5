@@ -619,6 +619,7 @@ describe('Wallet V5 sign auth external', () => {
             .endCell();
 
         const fakePayload = beginCell()
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(vu, 32)
             .storeUint(seqno + 1, 32) // seqno
@@ -627,8 +628,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(fakePayload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>
@@ -649,6 +650,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
@@ -659,8 +661,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(payload.hash(), fakeKeypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>
@@ -681,6 +683,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno + 1, 32) // seqno
@@ -689,8 +692,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>
@@ -711,6 +714,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(Math.round(Date.now() / 1000) - 600, 32)
             .storeUint(seqno, 32)
@@ -719,8 +723,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>
@@ -741,6 +745,7 @@ describe('Wallet V5 sign auth external', () => {
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
         const payload = beginCell()
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
@@ -749,8 +754,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>
