@@ -138,7 +138,7 @@ export class WalletV5 implements Contract {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Opcodes.auth_signed_internal, 32)
+                // .storeUint(Opcodes.auth_signed_internal, 32) // Is signed inside message
                 .storeSlice(opts.body.beginParse())
                 .endCell()
         });
@@ -172,7 +172,10 @@ export class WalletV5 implements Contract {
 
     async sendExternalSignedMessage(provider: ContractProvider, body: Cell) {
         await provider.external(
-            beginCell().storeUint(Opcodes.auth_signed, 32).storeSlice(body.beginParse()).endCell()
+            beginCell()
+                // .storeUint(Opcodes.auth_signed, 32) // Is signed inside message
+                .storeSlice(body.beginParse())
+                .endCell()
         );
     }
 

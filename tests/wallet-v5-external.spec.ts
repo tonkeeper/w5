@@ -74,7 +74,7 @@ describe('Wallet V5 sign auth external', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(0x7369676e, 32)
+            .storeUint(Opcodes.auth_signed, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
@@ -84,8 +84,8 @@ describe('Wallet V5 sign auth external', () => {
         const signature = sign(payload.hash(), keypair.secretKey);
         seqno++;
         return beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
     }
 
@@ -770,7 +770,8 @@ describe('Wallet V5 sign auth external', () => {
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
-        const payload = beginCell()
+        const payload = beginCell() // TODO: Seems to pass with auth_signed, need analysis!
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
@@ -779,8 +780,8 @@ describe('Wallet V5 sign auth external', () => {
 
         const signature = sign(payload.hash(), keypair.secretKey);
         const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
         await disableConsoleError(() =>

@@ -1,6 +1,6 @@
 import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
-import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
+import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
@@ -44,7 +44,7 @@ describe('Wallet V5 extensions auth', () => {
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
-            .storeUint(0x73696e74, 32)
+            .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
@@ -54,8 +54,8 @@ describe('Wallet V5 extensions auth', () => {
         const signature = sign(payload.hash(), keypair.secretKey);
         seqno++;
         return beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
             .storeSlice(payload.beginParse())
+            .storeUint(bufferToBigInt(signature), 512)
             .endCell();
     }
 
