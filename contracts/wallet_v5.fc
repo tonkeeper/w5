@@ -116,7 +116,7 @@ cell verify_actions(cell c5) inline {
       } else {
         ;; disallow
         if (stored_seqno >= 0) {
-          ds = ds.skip_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
+          ds = ds.skip_bits(size::stored_subwallet + size::public_key);
           var extensions_is_not_null = ds.preload_uint(1);
           throw_unless(42, extensions_is_not_null);
           ;; Corner case: 0 -> 1 -> -1
