@@ -107,23 +107,21 @@ cell verify_actions(cell c5) inline {
       var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
       if (allow) {
         ;; allow
-        if (stored_seqno < 0) {
-          ;; Can't be disabled with 0 because disabling increments seqno
-          ;; -123 -> 123 -> 124
-          stored_seqno = - stored_seqno;
-          stored_seqno = stored_seqno + 1;
-        }
+        throw_unless(43, stored_seqno < 0);
+        ;; Can't be disallowed with 0 because disallowing increments seqno
+        ;; -123 -> 123 -> 124
+        stored_seqno = - stored_seqno;
+        stored_seqno = stored_seqno + 1;
       } else {
         ;; disallow
-        if (stored_seqno >= 0) {
-          ds = ds.skip_bits(size::stored_subwallet + size::public_key);
-          var extensions_is_not_null = ds.preload_uint(1);
-          throw_unless(42, extensions_is_not_null);
-          ;; Corner case: 0 -> 1 -> -1
-          ;; 123 -> 124 -> -124
-          stored_seqno = stored_seqno + 1;
-          stored_seqno = - stored_seqno;
-        }
+        throw_unless(43, stored_seqno >= 0);
+        ds = ds.skip_bits(size::stored_subwallet + size::public_key);
+        var extensions_is_not_null = ds.preload_uint(1);
+        throw_unless(42, extensions_is_not_null);
+        ;; Corner case: 0 -> 1 -> -1
+        ;; 123 -> 124 -> -124
+        stored_seqno = stored_seqno + 1;
+        stored_seqno = - stored_seqno;
       }
       set_data(begin_cell()
         .store_int(stored_seqno, size::stored_seqno)
@@ -137,10 +135,9 @@ cell verify_actions(cell c5) inline {
     }
     -}
     else {
+      ;; need to throw on unsupported actions for correct flow and for testability
       throw(41); ;; unsupported action
     }
-    ;; Other actions are no-op
-    ;; FIXME: is it costlier to check for unsupported actions and throw?
     cs = cs.preload_ref().begin_parse();
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
@@ -166,6 +163,7 @@ cell verify_actions(cell c5) inline {
   var stored_subwallet = ds~load_uint(size::stored_subwallet);
   var public_key = ds.preload_uint(size::public_key);
 
+  ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
   ;; Only such checking order results in least amount of gas
   throw_unless(35, check_signature(slice_hash(signed), signature, public_key));
   ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
@@ -233,6 +231,7 @@ cell verify_actions(cell c5) inline {
   var stored_subwallet = ds~load_uint(size::stored_subwallet);
   var public_key = ds.preload_uint(size::public_key);
 
+  ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
   ;; Only such checking order results in least amount of gas
   return_unless(check_signature(slice_hash(signed), signature, public_key));
   ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0

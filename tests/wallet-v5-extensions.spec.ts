@@ -8,7 +8,7 @@ import { bufferToBigInt, createMsgInternal, packAddress, validUntil } from './ut
 import {
     ActionAddExtension,
     ActionRemoveExtension,
-    ActionSendMsg,
+    ActionSendMsg, ActionSetSignatureAuthAllowed,
     packActionsList
 } from './actions';
 import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
@@ -319,5 +319,111 @@ describe('Wallet V5 extensions auth', () => {
 
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore);
+    });
+
+    it('Disallow signature auth and do a transfer from extension', async () => {
+        await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!),
+                new ActionSetSignatureAuthAllowed(false)
+            ]))
+        });
+
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actions = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
+
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actions
+        });
+
+        expect(receipt.transactions.length).toEqual(3);
+        accountForGas(receipt.transactions);
+
+        expect(receipt.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const fee = receipt.transactions[2].totalFees.coins;
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
+    });
+
+    it('Disallow signature auth; re-allow and self-delete by extension; do signed transfer', async () => {
+        await walletV5.sendInternalSignedMessage(sender, {
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!),
+                new ActionSetSignatureAuthAllowed(false)
+            ]))
+        });
+
+        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+        expect(isSignatureAuthAllowed).toEqual(0);
+
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: packActionsList([
+                new ActionRemoveExtension(sender.address!),
+                new ActionSetSignatureAuthAllowed(true)
+            ])
+        });
+
+        expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
+        expect(
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(0);
+
+        const isSignatureAuthAllowed1 = await walletV5.getIsSignatureAuthAllowed();
+        expect(isSignatureAuthAllowed1).toEqual(-1);
+
+        const contract_seqno = await walletV5.getSeqno();
+        expect(contract_seqno).toEqual(seqno + 2);
+
+        // Allowing or disallowing signature auth increments seqno, need to re-read
+        seqno = contract_seqno;
+
+        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const forwardValue = toNano(0.001);
+
+        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+
+        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+
+        const actionsList2 = packActionsList([
+            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
+        ]);
+
+        const receipt2 = await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(actionsList2)
+        });
+
+        expect(receipt2.transactions.length).toEqual(3);
+        accountForGas(receipt2.transactions);
+
+        expect(receipt2.transactions).toHaveTransaction({
+            from: walletV5.address,
+            to: testReceiver,
+            value: forwardValue
+        });
+
+        const fee = receipt2.transactions[2].totalFees.coins;
+        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
     });
 });
