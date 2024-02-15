@@ -21,6 +21,8 @@ import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDes
 import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
+import { ActionSetCode, ActionSetData } from './test-only-actions';
+import { WalletV4 } from '../wrappers/wallet-v4';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: -1, subwalletNumber: 0 });
 
@@ -339,108 +341,6 @@ describe('Wallet V5 sign auth external', () => {
         );
     });
 
-    /* TODO: Rewrite as a negative test
-    it('Set data and do two transfers', async () => {
-        const testReceiver1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const forwardValue1 = toNano(0.001);
-
-        const testReceiver2 = Address.parse('EQCgYDKqfTh7zVj9BQwOIPs4SuOhM7wnIjb6bdtM2AJf_Z9G');
-        const forwardValue2 = toNano(0.0012);
-
-        const receiver1BalanceBefore = (await blockchain.getContract(testReceiver1)).balance;
-        const receiver2BalanceBefore = (await blockchain.getContract(testReceiver2)).balance;
-
-        const msg1 = createMsgInternal({ dest: testReceiver1, value: forwardValue1 });
-        const msg2 = createMsgInternal({ dest: testReceiver2, value: forwardValue2 });
-
-        const actionsList = packActionsList([
-            new ActionSetData(beginCell().storeInt(239, 33).endCell()),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg1),
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg2)
-        ]);
-
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-
-        expect(receipt.transactions.length).toEqual(3);
-        accountForGas(receipt.transactions);
-
-        expect(receipt.transactions).toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver1,
-            value: forwardValue1
-        });
-
-        expect(receipt.transactions).toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver2,
-            value: forwardValue2
-        });
-
-        const fee1 = receipt.transactions[1].totalFees.coins;
-        const fee2 = receipt.transactions[2].totalFees.coins;
-
-        const receiver1BalanceAfter = (await blockchain.getContract(testReceiver1)).balance;
-        const receiver2BalanceAfter = (await blockchain.getContract(testReceiver2)).balance;
-        expect(receiver1BalanceAfter).toEqual(receiver1BalanceBefore + forwardValue1 - fee1);
-        expect(receiver2BalanceAfter).toEqual(receiver2BalanceBefore + forwardValue2 - fee2);
-
-        const storedSeqno = await walletV5.getSeqno();
-        expect(storedSeqno).toEqual(239);
-    });
-    */
-
-    /* TODO: Rewrite as a negative test
-    it('Send 255 transfers and do set data', async () => {
-        await (
-            await blockchain.treasury('mass-messages')
-        ).send({ to: walletV5.address, value: toNano(100) });
-
-        const range = [...new Array(255)].map((_, index) => index);
-
-        const receivers = range.map(i => Address.parseRaw('0:' + i.toString().padStart(64, '0')));
-        const balancesBefore = (
-            await Promise.all(receivers.map(r => blockchain.getContract(r)))
-        ).map(i => i.balance);
-
-        const forwardValues = range.map(i => BigInt(toNano(0.000001 * i)));
-
-        const msges = receivers.map((dest, i) =>
-            createMsgInternal({ dest: dest, value: forwardValues[i] })
-        );
-
-        const actionsList = packActionsList([
-            new ActionSetData(beginCell().storeInt(239, 33).endCell()),
-            ...msges.map(msg => new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg))
-        ]);
-
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-
-        expect(receipt.transactions.length).toEqual(range.length + 1);
-        accountForGas(receipt.transactions);
-
-        receivers.forEach((to, i) => {
-            expect(receipt.transactions).toHaveTransaction({
-                from: walletV5.address,
-                to,
-                value: forwardValues[i]
-            });
-        });
-
-        const balancesAfter = (
-            await Promise.all(receivers.map(r => blockchain.getContract(r)))
-        ).map(i => i.balance);
-
-        const fees = receipt.transactions.slice(1).map(tx => tx.totalFees.coins);
-
-        balancesAfter.forEach((balanceAfter, i) => {
-            expect(balanceAfter).toEqual(balancesBefore[i] + forwardValues[i] - fees[i]);
-        });
-
-        const storedSeqno = await walletV5.getSeqno();
-        expect(storedSeqno).toEqual(239);
-    });
-    */
-
     it('Remove extension', async () => {
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
@@ -471,76 +371,37 @@ describe('Wallet V5 sign auth external', () => {
         accountForGas(receipt2.transactions);
     });
 
-    /* TODO: Rewrite as a negative test
-    it('Change code and data to wallet v4', async () => {
-        const code_v4 = await compile('wallet_v4');
-        const data_v4 = beginCell()
-            .storeUint(0, 32)
-            .storeUint(0, 32)
-            .storeBuffer(keypair.publicKey, 32)
-            .storeDict(Dictionary.empty())
-            .endCell();
+    it('Should fail SetData action', async () => {
+        const cell = beginCell().endCell();
 
         const actionsList = packActionsList([
-            new ActionSetData(data_v4),
-            new ActionSetCode(code_v4)
+            new ActionSetData(cell)
         ]);
-        const receipt1 = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt1.transactions);
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
 
-        const walletV4 = blockchain.openContract(WalletV4.createFromAddress(walletV5.address));
-        const seqno = await walletV4.getSeqno();
-        const subwalletId = await walletV4.getSubWalletID();
-        const publicKey = await walletV4.getPublicKey();
-        const extensions = Dictionary.loadDirect(
-            Dictionary.Keys.Address(),
-            Dictionary.Values.BigInt(0),
-            await walletV4.getExtensions()
-        );
-
-        expect(seqno).toEqual(0);
-        expect(subwalletId).toEqual(0);
-        expect(publicKey).toEqual(bufferToBigInt(keypair.publicKey));
-        expect(extensions.size).toEqual(0);
-
-        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const forwardValue = toNano(0.001);
-
-        const sendTxMsg = beginCell()
-            .storeUint(0x10, 6)
-            .storeAddress(testReceiver)
-            .storeCoins(forwardValue)
-            .storeUint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-            .storeRef(beginCell().endCell())
-            .endCell();
-
-        const mesagesCell = beginCell()
-            .storeUint(0, 8)
-            .storeUint(SendMode.PAY_GAS_SEPARATELY, 8)
-            .storeRef(sendTxMsg)
-            .endCell();
-
-        const payload = beginCell()
-            .storeUint(0, 32)
-            .storeUint(validUntil(), 32)
-            .storeUint(0, 32)
-            .storeSlice(mesagesCell.beginParse())
-            .endCell();
-
-        const signature = sign(payload.hash(), keypair.secretKey);
-        const body = beginCell()
-            .storeUint(bufferToBigInt(signature), 512)
-            .storeSlice(payload.beginParse())
-            .endCell();
-
-        const receipt = await walletV4.sendExternalSignedMessage(body);
-        expect(receipt.transactions).toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver,
-            value: forwardValue
-        });
+        expect(
+            (
+                (receipt.transactions[0].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(41);
     });
-    */
+
+    it('Should fail SetCode action', async () => {
+        const cell = beginCell().endCell();
+
+        const actionsList = packActionsList([
+            new ActionSetCode(cell)
+        ]);
+        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+
+        expect(
+            (
+                (receipt.transactions[0].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(9);
+    });
 
     it('Should fail adding existing extension', async () => {
         const testExtension = Address.parseRaw('0:' + '0'.repeat(64));
@@ -775,7 +636,7 @@ describe('Wallet V5 sign auth external', () => {
         const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
         const actionsList = packActionsList([new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)]);
 
-        const payload = beginCell() // TODO: Seems to pass with auth_signed, need analysis!
+        const payload = beginCell() // auth_signed_internal used instead of auth_signed
             .storeUint(Opcodes.auth_signed_internal, 32)
             .storeUint(WALLET_ID.serialized, 80)
             .storeUint(validUntil(), 32)
@@ -792,7 +653,7 @@ describe('Wallet V5 sign auth external', () => {
         await disableConsoleError(() =>
             expect(
                 walletV5.sendExternal(
-                    beginCell().storeUint(1111, 32).storeSlice(body.beginParse()).endCell()
+                    beginCell().storeSlice(body.beginParse()).endCell()
                 )
             ).rejects.toThrow()
         );

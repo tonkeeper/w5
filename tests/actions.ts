@@ -1,4 +1,5 @@
 import { Address, beginCell, Cell, MessageRelaxed, SendMode, storeMessageRelaxed } from 'ton-core';
+import { isTestOnlyExtendedAction, TestOnlyExtendedAction, TestOnlyOutAction } from './test-only-actions';
 
 export class ActionSendMsg {
     public static readonly tag = 0x0ec3c86d;
@@ -55,17 +56,19 @@ export class ActionSetSignatureAuthAllowed {
     }
 }
 
-export type OutAction = ActionSendMsg;
+export type OutAction = ActionSendMsg | TestOnlyOutAction;
 export type ExtendedAction =
     | ActionAddExtension
     | ActionRemoveExtension
-    | ActionSetSignatureAuthAllowed;
+    | ActionSetSignatureAuthAllowed
+    | TestOnlyExtendedAction;
 
 export function isExtendedAction(action: OutAction | ExtendedAction): action is ExtendedAction {
     return (
         action.tag === ActionAddExtension.tag ||
         action.tag === ActionRemoveExtension.tag ||
-        action.tag === ActionSetSignatureAuthAllowed.tag
+        action.tag === ActionSetSignatureAuthAllowed.tag ||
+        isTestOnlyExtendedAction(action)
     );
 }
 

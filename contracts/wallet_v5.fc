@@ -136,6 +136,9 @@ cell verify_actions(cell c5) inline {
       set_data(cs~load_ref());
     }
     -}
+    else {
+      throw(41); ;; unsupported action
+    }
     ;; Other actions are no-op
     ;; FIXME: is it costlier to check for unsupported actions and throw?
     cs = cs.preload_ref().begin_parse();
