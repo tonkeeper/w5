@@ -23,7 +23,7 @@ export type WalletV5Config = {
 
 export function walletV5ConfigToCell(config: WalletV5Config): Cell {
     return beginCell()
-        .storeUint(config.seqno, 32)
+        .storeInt(config.seqno, 33)
         .storeUint(config.walletId, 80)
         .storeBuffer(config.publicKey, 32)
         .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
@@ -36,8 +36,10 @@ export const Opcodes = {
     action_extended_set_data: 0x1ff8ea0b,
     action_extended_add_extension: 0x1c40db9f,
     action_extended_remove_extension: 0x5eaef4a4,
+    action_extended_set_signature_auth_allowed: 0x20cbb95a,
     auth_extension: 0x6578746e,
-    auth_signed: 0x7369676e
+    auth_signed: 0x7369676e,
+    auth_signed_internal: 0x73696e74
 };
 
 export class WalletId {
@@ -136,7 +138,7 @@ export class WalletV5 implements Contract {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Opcodes.auth_signed, 32)
+                // .storeUint(Opcodes.auth_signed_internal, 32) // Is signed inside message
                 .storeSlice(opts.body.beginParse())
                 .endCell()
         });
@@ -170,7 +172,10 @@ export class WalletV5 implements Contract {
 
     async sendExternalSignedMessage(provider: ContractProvider, body: Cell) {
         await provider.external(
-            beginCell().storeUint(Opcodes.auth_signed, 32).storeSlice(body.beginParse()).endCell()
+            beginCell()
+                // .storeUint(Opcodes.auth_signed, 32) // Is signed inside message
+                .storeSlice(body.beginParse())
+                .endCell()
         );
     }
 
@@ -190,6 +195,16 @@ export class WalletV5 implements Contract {
             return res.stack.readNumber();
         } else {
             return 0;
+        }
+    }
+
+    async getIsSignatureAuthAllowed(provider: ContractProvider) {
+        const state = await provider.getState();
+        if (state.state.type === 'active') {
+            let res = await provider.get('get_is_signature_auth_allowed', []);
+            return res.stack.readNumber();
+        } else {
+            return -1;
         }
     }
 

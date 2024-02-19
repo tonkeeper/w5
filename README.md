@@ -10,7 +10,13 @@ Wallet V5 has 25% lower fees, can delegate payments for gas to third parties and
 -   `contracts` - source code of all the smart contracts of the project and their dependencies.
 -   `wrappers` - wrapper classes (implementing `Contract` from ton-core) for the contracts, including any [de]serialization primitives and compilation functions.
 -   `tests` - tests for the contracts.
--   `scripts` - scripts used by the project, mainly the deployment scripts.
+-   `scripts` - scripts used by the project, mainly the deployment scripts, additionally contains utilities for gas optimisation.
+-   `fift` - contains standard Fift v0.4.4 library including the assembler and disassembler for gas optimisation utilities.
+
+### Additional documentation
+
+-   [Gas improvements](Improvements.rst) - a log of improvements, detailed by primary code paths, global gas counters per commit.
+-   [Contest](Contest.md) - a note showing some information about interesting improvements during the optimisation contest.
 
 ## How to use
 
