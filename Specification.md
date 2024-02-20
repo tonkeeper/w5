@@ -34,21 +34,20 @@ Thanks to [Skydev](https://github.com/Skydev0h) for optimization and preparing t
 
 ## Overview
 
-Wallet V5 supports **2 authentication modes**, all standard output actions (send message, set library, code replacement) plus additional **3 operation types**.
+Wallet V5 supports **2 authentication modes** and **3 operations types**.
 
 Authentication:
 * by signature
 * by extension
 
-Operation types:
-* standard output send message action
-* enable or disable public key (signature authentication)
-* install extension
-* remove extension
+Operations:
+* standard "send message" action (up to 255 messages at once),
+* enable/disable signature authentication,
+* install/remove extension.
 
 Signed messages can be delivered both by external and internal messages.
 
-All operation types are available to all authentication modes.
+All operations are available to all authentication modes.
 
 ## Discussion
 
