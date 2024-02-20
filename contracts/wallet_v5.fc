@@ -231,15 +231,23 @@ cell verify_actions(cell c5) inline {
   var stored_subwallet = ds~load_uint(size::stored_subwallet);
   var public_key = ds.preload_uint(size::public_key);
 
+  ;; Note on bouncing/nonbouncing behaviour:
+  ;; In principle, the wallet should not bounce incoming messages as to avoid 
+  ;; returning deposits back to the sender due to opcode misinterpretation.
+  ;; However, specifically for "gasless" transactions (signed messages relayed by a 3rd party),
+  ;; there is a risk for the relaying party to be abused: their coins should be bounced back in case of a race condition or delays.
+  ;; We resolve this dilemma by silently failing at the signature check (therefore ordinary deposits with arbitrary opcodes never bounce),
+  ;; but failing with exception (therefore bouncing) after the signature check.
+  
   ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
   ;; Only such checking order results in least amount of gas
   return_unless(check_signature(slice_hash(signed), signature, public_key));
   ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
   ;; However, msg_seqno is uint, therefore it can be only greater or equal to zero: msg_seqno >= 0
   ;; Thus, if public key is disabled, these two domains NEVER intersect, and additional check is not needed
-  return_unless(msg_seqno == stored_seqno);
-  return_unless(subwallet_id == stored_subwallet);
-  return_if(valid_until <= now());
+  throw_unless(msg_seqno == stored_seqno);
+  throw_unless(subwallet_id == stored_subwallet);
+  throw_if(valid_until <= now());
 
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
