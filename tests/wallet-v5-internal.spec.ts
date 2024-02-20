@@ -597,7 +597,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(0);
+        ).toEqual(33);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -642,7 +642,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(0);
+        ).toEqual(36);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -687,7 +687,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(0);
+        ).toEqual(34);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -1166,7 +1166,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt2.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(0);
+        ).toEqual(33);
 
         expect(receipt2.transactions).not.toHaveTransaction({
             from: walletV5.address,
