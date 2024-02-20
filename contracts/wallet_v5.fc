@@ -245,9 +245,9 @@ cell verify_actions(cell c5) inline {
   ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
   ;; However, msg_seqno is uint, therefore it can be only greater or equal to zero: msg_seqno >= 0
   ;; Thus, if public key is disabled, these two domains NEVER intersect, and additional check is not needed
-  throw_unless(msg_seqno == stored_seqno);
-  throw_unless(subwallet_id == stored_subwallet);
-  throw_if(valid_until <= now());
+  throw_unless(33, msg_seqno == stored_seqno);
+  throw_unless(34, subwallet_id == stored_subwallet);
+  throw_if(36, valid_until <= now());
 
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
