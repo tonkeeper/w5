@@ -81,6 +81,7 @@ cell verify_actions(cell c5) inline {
 
       var ds = get_data().begin_parse();
       var data_bits = ds~load_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
+      var stored_seqno = data_bits.preload_int(size::stored_seqno);
       var extensions = ds.preload_dict();
 
       ;; Add extension
@@ -93,6 +94,7 @@ cell verify_actions(cell c5) inline {
       {
         (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
         throw_unless(40, success?);
+        throw_if(44, null?(extensions) & (stored_seqno < 0));
       }
 
       set_data(begin_cell()
