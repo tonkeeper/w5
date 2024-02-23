@@ -1011,15 +1011,14 @@ describe('Wallet V5 sign auth internal', () => {
         expect(contract_seqno).toEqual(seqno + 1);
     });
 
-    it('Should add ext, disallow sign, remove ext, allow sign in one tx; send in other', async () => {
-        // N.B. Test that zero extensions do not prevent re-allowing the signature authentication
+    it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
             new ActionAddExtension(testExtension),
             new ActionSetSignatureAuthAllowed(false),
+            new ActionSetSignatureAuthAllowed(true),
             new ActionRemoveExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(true)
         ]);
 
         const receipt = await walletV5.sendInternal(sender, {
@@ -1076,6 +1075,35 @@ describe('Wallet V5 sign auth internal', () => {
         const fee = receipt2.transactions[2].totalFees.coins;
         const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
         expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
+    });
+
+    it('Should fail removing last extension with signature auth disabled', async () => {
+        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+
+        const actionsList = packActionsList([
+            new ActionAddExtension(testExtension),
+            new ActionSetSignatureAuthAllowed(false),
+            new ActionRemoveExtension(testExtension)
+        ]);
+
+        const receipt = await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(actionsList)
+        });
+
+        expect(receipt.transactions.length).toEqual(2);
+        accountForGas(receipt.transactions);
+
+        expect(
+            (
+                (receipt.transactions[1].description as TransactionDescriptionGeneric)
+                    .computePhase as TransactionComputeVm
+            ).exitCode
+        ).toEqual(44);
+
+        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+        expect(isSignatureAuthAllowed).toEqual(-1);
     });
 
     it('Should fail disallowing signature auth twice in tx', async () => {

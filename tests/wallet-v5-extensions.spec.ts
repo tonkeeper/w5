@@ -372,8 +372,8 @@ describe('Wallet V5 extensions auth', () => {
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
             value: toNano('0.1'),
             body: packActionsList([
-                new ActionRemoveExtension(sender.address!),
-                new ActionSetSignatureAuthAllowed(true)
+                new ActionSetSignatureAuthAllowed(true),
+                new ActionRemoveExtension(sender.address!)
             ])
         });
 
@@ -461,8 +461,8 @@ describe('Wallet V5 extensions auth', () => {
         const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
             value: toNano('0.1'),
             body: packActionsList([
-                new ActionRemoveExtension(sender.address!),
-                new ActionSetSignatureAuthAllowed(true)
+                new ActionSetSignatureAuthAllowed(true),
+                new ActionRemoveExtension(sender.address!)
             ])
         });
 
