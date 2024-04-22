@@ -6,6 +6,7 @@ import { compile } from '@ton-community/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed } from 'ton-crypto';
 import { bufferToBigInt, packAddress } from './utils';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
+import crypto from 'crypto';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
 
@@ -128,6 +129,7 @@ describe('Wallet V5 get methods', () => {
     it('Get extensions array', async () => {
         const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const plugin2 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
+        const plugin3 = Address.parse('0:0F0DF5851B4A185F5F63C0D0CD0412F5ACA353F577DA18FF47C936F99DBD849A');
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
@@ -135,13 +137,15 @@ describe('Wallet V5 get methods', () => {
         );
         extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
         extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
+        extensions.set(packAddress(plugin3), BigInt(plugin3.workChain));
 
         await deploy({ extensions });
 
         const actual = await walletV5.getExtensionsArray();
-        expect(actual.length).toBe(2);
-        expect(actual[0].equals(plugin1)).toBeTruthy();
-        expect(actual[1].equals(plugin2)).toBeTruthy();
+        expect(actual.length).toBe(3);
+        expect(actual[1].equals(plugin1)).toBeTruthy();
+        expect(actual[2].equals(plugin2)).toBeTruthy();
+        expect(actual[0].equals(plugin3)).toBeTruthy();
     });
 
     it('Get empty extensions array', async () => {
