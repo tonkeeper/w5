@@ -1,8 +1,8 @@
-# Wallet V5
+# 🔥W5: wallet v5 standard
 
 This is an extensible wallet specification aimed at replacing V4 and allowing arbitrary extensions.
 
-Wallet V5 has 25% lower fees, can delegate payments for gas to third parties and supports flexible extension mechanism.
+W5 has **25% lower fees**, supports **gasless transactions** (via third party relayers) and implements a **flexible extension mechanism**.
 
 ## Project structure
 
