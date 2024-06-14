@@ -232,7 +232,7 @@ export class WalletV5 implements Contract {
 
         return dict.keys().map(key => {
             const wc = dict.get(key)!;
-            const addressHex = key ^ (wc + 1n);
+            const addressHex = key;
             return Address.parseRaw(`${wc}:${addressHex.toString(16)}`);
         });
     }

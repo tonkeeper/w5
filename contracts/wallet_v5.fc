@@ -32,11 +32,6 @@ const int size::flags = 4;
 
 ;; Extensible wallet contract v5
 
-;; Compresses 8+256-bit address into 256-bit uint by cutting off one bit from sha256.
-;; This allows us to save on wrapping the address in a cell and make plugin requests cheaper.
-;; This method also unpacks address hash if you pass packed hash with the original wc.
-int pack_address((int, int) address) impure asm "SWAP" "INC" "XOR"; ;; hash ^ (wc+1)
-
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
 () set_actions(cell action_list) impure asm "c5 POP";
 
@@ -79,7 +74,9 @@ cell verify_actions(cell c5, int is_external) inline {
     ;; Add/remove extensions
     if (is_add_ext? | is_del_ext?) {
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
-      int packed_addr = pack_address((wc, hash) );
+      (int my_wc, _) = parse_std_addr(my_address());
+
+      throw_unless(45, my_wc == wc);
 
       var ds = get_data().begin_parse();
       var data_bits = ds~load_bits(size::stored_seqno + size::stored_subwallet + size::public_key);
@@ -88,13 +85,13 @@ cell verify_actions(cell c5, int is_external) inline {
 
       ;; Add extension
       if (is_add_ext?) {
-        (extensions, int success?) = extensions.udict_add_builder?(256, packed_addr, begin_cell().store_int(wc,8));
+        (extensions, int success?) = extensions.udict_add_builder?(256, hash, begin_cell().store_int(wc,8));
         throw_unless(39, success?);
       } else
       ;; Remove extension if (op == 0x5eaef4a4)
       ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
       {
-        (extensions, int success?) = extensions.udict_delete?(256, packed_addr);
+        (extensions, int success?) = extensions.udict_delete?(256, hash);
         throw_unless(40, success?);
         throw_if(44, null?(extensions) & (stored_seqno < 0));
       }
@@ -248,7 +245,10 @@ cell verify_actions(cell c5, int is_external) inline {
   if (is_extn?) { ;; "extn" authenticated by extension
 
     ;; Authenticate extension by its address.
-    int packed_sender_addr = pack_address(parse_std_addr(full_msg_slice~load_msg_addr())); ;; no PLDMSGADDR exists
+    (int sender_wc, int sender_hash) = parse_std_addr(full_msg_slice~load_msg_addr()); ;; no PLDMSGADDR exists
+    (int my_wc, _) = parse_std_addr(my_address());
+
+    return_unless(my_wc == sender_wc);
 
     var ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
@@ -256,7 +256,7 @@ cell verify_actions(cell c5, int is_external) inline {
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-    var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
+    extensions.udict_get_or_return(256, sender_hash); ;; kindof ifnot (success?) { return(); }
 
     dispatch_complex_request(body, false);
     return ();

@@ -5,8 +5,7 @@ export function bufferToBigInt(buffer: Buffer): bigint {
 }
 
 export function packAddress(address: Address) {
-    const wcPlus = address.workChain + 1;
-    return bufferToBigInt(address.hash) ^ BigInt(wcPlus);
+    return bufferToBigInt(address.hash);
 }
 
 export function validUntil(ttlMs = 1000 * 60 * 3) {

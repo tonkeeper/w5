@@ -107,7 +107,7 @@ describe('Wallet V5 get methods', () => {
 
     it('Get extensions dict', async () => {
         const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const plugin2 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
+        const plugin2 = Address.parse('EQA2pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX5Bf');
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
@@ -127,7 +127,7 @@ describe('Wallet V5 get methods', () => {
 
     it('Get extensions array', async () => {
         const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const plugin2 = Address.parse('Ef82pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX28X');
+        const plugin2 = Address.parse('EQA2pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX5Bf');
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
