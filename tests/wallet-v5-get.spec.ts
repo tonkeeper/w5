@@ -127,8 +127,11 @@ describe('Wallet V5 get methods', () => {
     });
 
     it('Get extensions array', async () => {
-        const plugin1 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const plugin2 = Address.parse('EQA2pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX5Bf');
+        const plugin1 = Address.parse(
+            '0:0000F5851B4A185F5F63C0D0CD0412F5ACA353F577DA18FF47C936F99DBD0000'
+        );
+        const plugin2 = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+        const plugin3 = Address.parse('EQA2pT4d8T7TyRsjW2BpGpGYga-lMA4JjQb4D2tc1PXMX5Bf');
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
@@ -136,13 +139,15 @@ describe('Wallet V5 get methods', () => {
         );
         extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
         extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
+        extensions.set(packAddress(plugin3), BigInt(plugin3.workChain));
 
         await deploy({ extensions });
 
         const actual = await walletV5.getExtensionsArray();
-        expect(actual.length).toBe(2);
+        expect(actual.length).toBe(3);
         expect(actual[0].equals(plugin1)).toBeTruthy();
         expect(actual[1].equals(plugin2)).toBeTruthy();
+        expect(actual[2].equals(plugin3)).toBeTruthy();
     });
 
     it('Get empty extensions array', async () => {

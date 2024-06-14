@@ -235,7 +235,7 @@ export class WalletV5 implements Contract {
         return dict.keys().map(key => {
             const wc = dict.get(key)!;
             const addressHex = key;
-            return Address.parseRaw(`${wc}:${addressHex.toString(16)}`);
+            return Address.parseRaw(`${wc}:${addressHex.toString(16).padStart(64, '0')}`);
         });
     }
 }
