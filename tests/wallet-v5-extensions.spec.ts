@@ -68,6 +68,7 @@ describe('Wallet V5 extensions auth', () => {
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
+                    signature_auth_disabled: false,
                     seqno: 0,
                     walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,
@@ -391,10 +392,7 @@ describe('Wallet V5 extensions auth', () => {
         expect(isSignatureAuthAllowed1).toEqual(-1);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 2);
-
-        // Allowing or disallowing signature auth increments seqno, need to re-read
-        seqno = contract_seqno;
+        expect(contract_seqno).toEqual(seqno);
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
@@ -480,10 +478,7 @@ describe('Wallet V5 extensions auth', () => {
         expect(isSignatureAuthAllowed1).toEqual(-1);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 2);
-
-        // Allowing or disallowing signature auth increments seqno, need to re-read
-        seqno = contract_seqno;
+        expect(contract_seqno).toEqual(seqno);
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);

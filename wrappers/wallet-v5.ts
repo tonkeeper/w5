@@ -15,6 +15,7 @@ import {
 import { bufferToBigInt } from '../tests/utils';
 
 export type WalletV5Config = {
+    signature_auth_disabled: boolean;
     seqno: number;
     walletId: bigint;
     publicKey: Buffer;
@@ -23,7 +24,8 @@ export type WalletV5Config = {
 
 export function walletV5ConfigToCell(config: WalletV5Config): Cell {
     return beginCell()
-        .storeInt(config.seqno, 33)
+        .storeBit(config.signature_auth_disabled)
+        .storeUint(config.seqno, 32)
         .storeUint(config.walletId, 80)
         .storeBuffer(config.publicKey, 32)
         .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))

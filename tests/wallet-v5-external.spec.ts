@@ -58,6 +58,7 @@ describe('Wallet V5 sign auth external', () => {
         const _walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
+                    signature_auth_disabled: params?.signature_auth_disabled ?? false,
                     seqno: params?.seqno ?? 0,
                     walletId: params?.walletId ?? WALLET_ID.serialized,
                     publicKey: params?.publicKey ?? _keypair.publicKey,
@@ -100,6 +101,7 @@ describe('Wallet V5 sign auth external', () => {
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
+                    signature_auth_disabled: false,
                     seqno: 0,
                     walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,
@@ -746,7 +748,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(isSignatureAuthAllowed).toEqual(0);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 1);
+        expect(contract_seqno).toEqual(seqno);
     });
 
     it('Should add ext and disallow signature auth in separate txs', async () => {
@@ -797,7 +799,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(isSignatureAuthAllowed2).toEqual(0);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 1);
+        expect(contract_seqno).toEqual(seqno);
     });
 
     it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
@@ -823,10 +825,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(isSignatureAuthAllowed).toEqual(-1);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 2);
-
-        // Allowing or disallowing signature auth increments seqno, need to re-read
-        seqno = contract_seqno;
+        expect(contract_seqno).toEqual(seqno);
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
         const forwardValue = toNano(0.001);
@@ -932,7 +931,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(isSignatureAuthAllowed).toEqual(0);
 
         const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno + 1);
+        expect(contract_seqno).toEqual(seqno);
 
         await disableConsoleError(() =>
             expect(walletV5.sendExternalSignedMessage(createBody(packActionsList([])))).rejects.toThrow()

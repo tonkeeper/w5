@@ -180,7 +180,7 @@ actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
 Contract state:
 ```tl-b
 wallet_id$_ global_id:# wc:int8 version:(## 8) subwallet_number:# = WalletID;
-contract_state$_ seqno:int33 wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
+contract_state$_ signature_auth_disabled:(## 1) seqno:# wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
 ```
 
 ## Source code
