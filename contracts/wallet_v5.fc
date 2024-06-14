@@ -17,6 +17,8 @@ const int size::flags = 4;
 
 (slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET" "IFNOTRET";
 
+(slice, int) begin_parse_xc(cell c) asm "XCTOS";
+
 (slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 (slice, int) check_and_remove_sint_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
@@ -48,18 +50,18 @@ int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
 slice get_last_bits(slice s, int n) asm "SDCUTLAST";
 slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
 
-cell verify_actions(cell c5) inline {
+cell verify_actions(cell c5, int is_external) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
   ;; {-
-  slice c5s = c5.begin_parse();
+  (slice c5s, _) = c5.begin_parse_xc();
   return_if(c5s.slice_empty?());
   do {
     ;; only send_msg is allowed, set_code or reserve_currency are not
     c5s = c5s.enforce_and_remove_action_send_msg_prefix();
     ;; enforce that send_mode has 2 bit set
     ;; for that load 7 bits and make sure that they end with 1
-    throw_if(37, count_trailing_zeroes(c5s.preload_bits(7)));
-    c5s = c5s.preload_ref().begin_parse();
+    throw_if(37, is_external & count_trailing_zeroes(c5s.preload_bits(7)));
+    (c5s, _) = c5s.preload_ref().begin_parse_xc();
   } until (c5s.slice_empty?());
   ;; -}
   return c5;
@@ -68,7 +70,7 @@ cell verify_actions(cell c5) inline {
 ;; Dispatches already authenticated request.
 ;; this function is explicitly included as an inline reference - not completely inlined
 ;; completely inlining it causes undesirable code split and noticeable gas increase in some paths
-() dispatch_complex_request(slice cs) impure inline_ref {
+() dispatch_complex_request(slice cs, int is_external) impure inline_ref {
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_int(1)) {
@@ -144,81 +146,18 @@ cell verify_actions(cell c5) inline {
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions after verification:
-  set_actions(cs.preload_ref().verify_actions());
+  set_actions(cs.preload_ref().verify_actions(is_external));
   return ();
 }
 
 ;; ------------------------------------------------------------------------------------------------
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request_from_external_message(slice full_body) impure inline {
-  ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
-  slice signature = full_body.get_last_bits(512);
-  slice signed = full_body.remove_last_bits(512);
-
-  var cs = signed.skip_bits(32);
-  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::subwallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::msg_seqno));
-
-  var ds = get_data().begin_parse();
-  var stored_seqno = ds~load_int(size::stored_seqno);
-  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  var stored_subwallet = ds~load_uint(size::stored_subwallet);
-  var public_key = ds.preload_uint(size::public_key);
-
-  ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
-  ;; Only such checking order results in least amount of gas
-  throw_unless(35, check_signature(slice_hash(signed), signature, public_key));
-  ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
-  ;; However, msg_seqno is uint, therefore it can be only greater or equal to zero: msg_seqno >= 0
-  ;; Thus, if public key is disabled, these two domains NEVER intersect, and additional check is not needed
-  throw_unless(33, msg_seqno == stored_seqno);
-  throw_unless(34, subwallet_id == stored_subwallet);
-  throw_if(36, valid_until <= now());
-
-  accept_message();
-
-  ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
-  stored_seqno = stored_seqno + 1;
-  set_data(begin_cell()
-          .store_int(stored_seqno, size::stored_seqno)
-          .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
-          .end_cell());
-
-  commit();
-
-  if (count_leading_zeroes(cs)) { ;; starts with bit 0
-    return set_actions(cs.preload_ref().verify_actions());
+() process_signed_request(slice full_body, int is_external) impure inline {
+  ifnot (is_external) {
+    ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
+    return_if(full_body.slice_bits() < 32 + size::subwallet_id + size::valid_until + size::msg_seqno + 1 + 512);
   }
-  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
-
-  ;; inline_ref required because otherwise it will produce undesirable JMPREF
-  dispatch_complex_request(cs);
-}
-
-() recv_external(slice body) impure inline {
-  slice full_body = body;
-  ;; 0x7369676E ("sign") external message authenticated by signature
-  body = enforce_and_remove_sign_prefix(body);
-  process_signed_request_from_external_message(full_body);
-  return();
-}
-
-;; ------------------------------------------------------------------------------------------------
-
-() dispatch_extension_request(slice cs, var dummy1) impure inline {
-  if (count_leading_zeroes(cs)) { ;; starts with bit 0
-    return set_actions(cs.preload_ref().verify_actions());
-  }
-  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
-  ;;
-  dummy1~impure_touch(); ;; DROP merged to 2DROP!
-  dispatch_complex_request(cs);
-}
-
-;; Same logic as above function but with return_* instead of throw_* and additional checks to prevent bounces
-() process_signed_request_from_internal_message(slice full_body) impure inline {
-  ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-  return_if(full_body.slice_bits() < 32 + size::subwallet_id + size::valid_until + size::msg_seqno + 1 + 512);
 
   ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
   slice signature = full_body.get_last_bits(512);
@@ -234,22 +173,32 @@ cell verify_actions(cell c5) inline {
   var public_key = ds.preload_uint(size::public_key);
 
   ;; Note on bouncing/nonbouncing behaviour:
-  ;; In principle, the wallet should not bounce incoming messages as to avoid 
+  ;; In principle, the wallet should not bounce incoming messages as to avoid
   ;; returning deposits back to the sender due to opcode misinterpretation.
   ;; However, specifically for "gasless" transactions (signed messages relayed by a 3rd party),
   ;; there is a risk for the relaying party to be abused: their coins should be bounced back in case of a race condition or delays.
   ;; We resolve this dilemma by silently failing at the signature check (therefore ordinary deposits with arbitrary opcodes never bounce),
   ;; but failing with exception (therefore bouncing) after the signature check.
-  
+
   ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
-  ;; Only such checking order results in least amount of gas
-  return_unless(check_signature(slice_hash(signed), signature, public_key));
+  int signature_is_valid = check_signature(slice_hash(signed), signature, public_key);
+  if (is_external) {
+    throw_unless(35, signature_is_valid);
+  } else {
+    ifnot (signature_is_valid) {
+      return();
+    }
+  }
   ;; If public key is disabled, stored_seqno is strictly less than zero: stored_seqno < 0
   ;; However, msg_seqno is uint, therefore it can be only greater or equal to zero: msg_seqno >= 0
   ;; Thus, if public key is disabled, these two domains NEVER intersect, and additional check is not needed
   throw_unless(33, msg_seqno == stored_seqno);
   throw_unless(34, subwallet_id == stored_subwallet);
   throw_if(36, valid_until <= now());
+
+  if (is_external) {
+    accept_message();
+  }
 
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
@@ -260,14 +209,18 @@ cell verify_actions(cell c5) inline {
 
   commit();
 
-  if (count_leading_zeroes(cs)) { ;; starts with bit 0
-    return set_actions(cs.preload_ref().verify_actions());
-  }
-  ;; <<<<<<<<<<---------- Simple primary cases gas evaluation ends here ---------->>>>>>>>>>
-
-  ;; inline_ref required because otherwise it will produce undesirable JMPREF
-  dispatch_complex_request(cs);
+  dispatch_complex_request(cs, is_external);
 }
+
+() recv_external(slice body) impure inline {
+  slice full_body = body;
+  ;; 0x7369676E ("sign") external message authenticated by signature
+  body = enforce_and_remove_sign_prefix(body);
+  process_signed_request(full_body, true);
+  return();
+}
+
+;; ------------------------------------------------------------------------------------------------
 
 () recv_internal(cell full_msg, slice body) impure inline {
 
@@ -305,8 +258,7 @@ cell verify_actions(cell c5) inline {
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     var wc = extensions.udict_get_or_return(256, packed_sender_addr); ;; kindof ifnot (success?) { return(); }
 
-    ;; auth_kind and wc are passed into dispatch_extension_request and later are dropped in batch with 3 BLKDROP
-    dispatch_extension_request(body, wc); ;; Special route for external address authenticated request
+    dispatch_complex_request(body, false);
     return ();
 
   }
@@ -316,7 +268,7 @@ cell verify_actions(cell c5) inline {
   return_unless(is_sint?);
 
   ;; Process the rest of the slice just like the signed request.
-  process_signed_request_from_internal_message(full_body);
+  process_signed_request(full_body, false);
   return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
 }
