@@ -43,14 +43,14 @@ const int signed_internal = 0x73696E74;
 
 slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
-;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
-() set_c5_actions(cell action_list) impure asm "c5 POP";
-
 int count_trailing_zeroes(slice cs) asm "SDCNTTRAIL0";
 int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
 
 slice get_last_bits(slice s, int n) asm "SDCUTLAST";
 slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
+
+;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
+() set_c5_actions(cell action_list) impure asm "c5 POP";
 
 cell verify_c5_actions(cell c5, int is_external) inline {
   (slice cs, _) = c5.begin_parse_raw();
@@ -103,17 +103,15 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       int allow_signature = cs~load_int(1);
       slice data_slice = get_data().begin_parse();
       int is_signature_allowed = data_slice~load_int(size::bool);
+      throw_if(error::this_signature_mode_already_set, is_signature_allowed == allow_signature);
+      is_signature_allowed = allow_signature;
+
       slice data_tail = data_slice; ;; seqno, wallet_id, public_key, extensions
-      if (allow_signature) { ;; allow
-        throw_if(error::this_signature_mode_already_set, is_signature_allowed);
-        is_signature_allowed = true;
-      } else { ;; disallow
-        throw_unless(error::this_signature_mode_already_set, is_signature_allowed);
-        data_slice = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key);
-        int is_extensions_not_empty = data_slice.preload_uint(1);
+      ifnot (allow_signature) { ;; disallow
+        int is_extensions_not_empty = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key).preload_uint(1);
         throw_unless(error::remove_last_extension_when_signature_disabled, is_extensions_not_empty);
-        is_signature_allowed = false;
       }
+
       set_data(begin_cell()
         .store_int(is_signature_allowed, size::bool)
         .store_slice(data_tail) ;; wallet_id, public_key, extensions
@@ -190,9 +188,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   return_if(in_msg_body.slice_refs_empty?()); ;; message with actions always have a ref
 
   slice in_msg_full_slice = in_msg_full.begin_parse();
-
   slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
-
   ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
   return_if(count_trailing_ones(message_flags_slice));
 
@@ -206,8 +202,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
     return_unless(my_address_wc == sender_address_wc);
 
-    slice data_slice = get_data().begin_parse();
-    cell extensions = data_slice.skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key).preload_dict();
+    cell extensions = get_data().begin_parse()
+      .skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key)
+      .preload_dict();
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
