@@ -230,25 +230,32 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 ;; ------------------------------------------------------------------------------------------------
 ;; Get methods
 
+int get_is_signature_auth_allowed() method_id {
+  return get_data().begin_parse()
+    .preload_int(size::bool);
+}
+
 int seqno() method_id {
-  return get_data().begin_parse().skip_bits(size::bool).preload_uint(size::seqno);
+  return get_data().begin_parse()
+    .skip_bits(size::bool)
+    .preload_uint(size::seqno);
 }
 
 int get_wallet_id() method_id {
-  return get_data().begin_parse().skip_bits(size::bool + size::seqno).preload_uint(size::wallet_id);
+  return get_data().begin_parse()
+    .skip_bits(size::bool + size::seqno)
+    .preload_uint(size::wallet_id);
 }
 
 int get_public_key() method_id {
-  slice data_slice = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id);
-  return data_slice.preload_uint(size::public_key);
+  return get_data().begin_parse()
+    .skip_bits(size::bool + size::seqno + size::wallet_id)
+    .preload_uint(size::public_key);
 }
 
 ;; Returns raw dictionary (or null if empty) where keys are address hashes. Workchains of extensions are same with wallet smart contract workchain
 cell get_extensions() method_id {
-  slice data_slice = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-  return data_slice.preload_dict();
-}
-
-int get_is_signature_auth_allowed() method_id {
-  return get_data().begin_parse().preload_int(size::bool);
+  return get_data().begin_parse()
+    .skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key)
+    .preload_dict();
 }
