@@ -12,11 +12,11 @@ const int size::message_flags = 4;
 () return_if(int cond) impure asm "IFRET";
 () return_unless(int cond) impure asm "IFNOTRET";
 
-(slice) udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET" "IFNOTRET";
+slice udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET" "IFNOTRET";
 
 (slice, int) begin_parse_xc(cell c) asm "XCTOS";
 
-(slice) enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
+slice enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 (slice, int) check_and_remove_sint_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
 
@@ -25,7 +25,7 @@ const int size::message_flags = 4;
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_auth_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
 
-(slice) enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
+slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
 ;; Extensible wallet contract v5
 
@@ -66,8 +66,8 @@ cell verify_actions(cell c5, int is_external) inline {
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_int(1)) {
-    var is_add_ext? = cs~check_and_remove_add_extension_prefix();
-    var is_del_ext? = is_add_ext? ? 0 : cs~check_and_remove_remove_extension_prefix();
+    int is_add_ext? = cs~check_and_remove_add_extension_prefix();
+    int is_del_ext? = is_add_ext? ? 0 : cs~check_and_remove_remove_extension_prefix();
     ;; Add/remove extensions
     if (is_add_ext? | is_del_ext?) {
       (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
@@ -75,10 +75,10 @@ cell verify_actions(cell c5, int is_external) inline {
 
       throw_unless(45, my_wc == wc);
 
-      var ds = get_data().begin_parse();
-      var data_bits = ds~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-      var signature_auth_disabled = data_bits.preload_int(size::bool);
-      var extensions = ds.preload_dict();
+      slice ds = get_data().begin_parse();
+      slice data_bits = ds~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
+      int signature_auth_disabled = data_bits.preload_int(size::bool);
+      cell extensions = ds.preload_dict();
 
       ;; Add extension
       if (is_add_ext?) {
@@ -99,11 +99,11 @@ cell verify_actions(cell c5, int is_external) inline {
               .end_cell());
     }
     elseif (cs~check_and_remove_set_signature_auth_allowed_prefix()) {
-      var allow? = cs~load_int(1);
-      var ds = get_data().begin_parse();
-      var signature_auth_disabled = ds~load_int(size::bool);
-      var stored_seqno = ds~load_uint(size::seqno);
-      var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+      int allow? = cs~load_int(1);
+      slice ds = get_data().begin_parse();
+      int signature_auth_disabled = ds~load_int(size::bool);
+      int stored_seqno = ds~load_uint(size::seqno);
+      slice immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
       if (allow?) {
         ;; allow
         throw_unless(43, signature_auth_disabled);
@@ -112,7 +112,7 @@ cell verify_actions(cell c5, int is_external) inline {
         ;; disallow
         throw_if(43, signature_auth_disabled);
         ds = ds.skip_bits(size::wallet_id + size::public_key);
-        var extensions_is_not_null = ds.preload_uint(1);
+        int extensions_is_not_null = ds.preload_uint(1);
         throw_unless(42, extensions_is_not_null);
         signature_auth_disabled = true;
       }
@@ -153,16 +153,16 @@ cell verify_actions(cell c5, int is_external) inline {
   slice signature = full_body.get_last_bits(512);
   slice signed = full_body.remove_last_bits(512);
 
-  var cs = signed.skip_bits(32);
-  var (subwallet_id, valid_until, msg_seqno) = (cs~load_uint(size::wallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::seqno));
+  slice cs = signed.skip_bits(32);
+  (int subwallet_id, int valid_until, int msg_seqno) = (cs~load_uint(size::wallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::seqno));
 
-  var ds = get_data().begin_parse();
-  var signature_auth_disabled = ds~load_int(size::bool);
+  slice ds = get_data().begin_parse();
+  int signature_auth_disabled = ds~load_int(size::bool);
 
-  var stored_seqno = ds~load_uint(size::seqno);
-  var immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  var stored_subwallet = ds~load_uint(size::wallet_id);
-  var public_key = ds.preload_uint(size::public_key);
+  int stored_seqno = ds~load_uint(size::seqno);
+  slice immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
+  int stored_subwallet = ds~load_uint(size::wallet_id);
+  int public_key = ds.preload_uint(size::public_key);
 
   ;; Note on bouncing/nonbouncing behaviour:
   ;; In principle, the wallet should not bounce incoming messages as to avoid
@@ -223,9 +223,9 @@ cell verify_actions(cell c5, int is_external) inline {
   return_if(body.slice_refs_empty?());
 
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
-  var full_msg_slice = full_msg.begin_parse();
+  slice full_msg_slice = full_msg.begin_parse();
 
-  var s_flags = full_msg_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  slice s_flags = full_msg_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
 
   ;; If bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
   return_if(count_trailing_ones(s_flags));
@@ -247,9 +247,9 @@ cell verify_actions(cell c5, int is_external) inline {
 
     return_unless(my_wc == sender_wc);
 
-    var ds = get_data().begin_parse();
+    slice ds = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
-    var extensions = ds.skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key).preload_dict();
+    cell extensions = ds.skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key).preload_dict();
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
@@ -283,14 +283,14 @@ int get_wallet_id() method_id {
 }
 
 int get_public_key() method_id {
-  var cs = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id);
+  slice cs = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id);
   return cs.preload_uint(size::public_key);
 }
 
 ;; Returns raw dictionary (or null if empty) where keys are packed addresses and the `wc` is stored in leafs.
 ;; User should unpack the address using the same packing function using `wc` to restore the original address.
 cell get_extensions() method_id {
-  var ds = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
+  slice ds = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
   return ds~load_dict();
 }
 
