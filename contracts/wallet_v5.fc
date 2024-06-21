@@ -139,7 +139,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 () process_signed_request(slice in_msg_body, int is_external) impure inline {
   ifnot (is_external) {
     ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-    return_if(in_msg_body.slice_bits() < size::message_type_prefix + size::bool + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature);
+    return_if(in_msg_body.slice_bits() < size::message_type_prefix + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature);
   }
 
   slice signature = in_msg_body.get_last_bits(size::signature);
