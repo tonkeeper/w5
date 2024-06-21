@@ -104,7 +104,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       slice data_slice = get_data().begin_parse();
       int is_signature_disabled = data_slice~load_int(size::bool);
       int stored_seqno = data_slice~load_uint(size::seqno);
-      slice data_tail = data_slice; ;; stored_subwallet ~ public_key ~ extensions
+      slice data_tail = data_slice; ;; wallet_id, public_key, extensions
       if (allow_signature) { ;; allow
         throw_unless(error::this_signature_mode_already_set, is_signature_disabled);
         is_signature_disabled = false;
@@ -118,7 +118,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       set_data(begin_cell()
         .store_int(is_signature_disabled, size::bool)
         .store_uint(stored_seqno, size::seqno)
-        .store_slice(data_tail) ;; stored_subwallet ~ public_key ~ extensions
+        .store_slice(data_tail) ;; wallet_id, public_key, extensions
         .end_cell());
     } else {
       throw(error::unspported_action);
@@ -148,7 +148,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   int is_signature_disabled = data_slice~load_int(size::bool);
 
   int stored_seqno = data_slice~load_uint(size::seqno);
-  slice data_tail = data_slice; ;; stored_subwallet ~ public_key ~ extensions
+  slice data_tail = data_slice; ;; wallet_id, public_key, extensions
   int stored_wallet_id = data_slice~load_uint(size::wallet_id);
   int public_key = data_slice.preload_uint(size::public_key);
 
@@ -177,7 +177,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   set_data(begin_cell()
     .store_int(false, size::bool)
     .store_uint(stored_seqno, size::seqno)
-    .store_slice(data_tail) ;; stored_subwallet ~ public_key ~ extensions
+    .store_slice(data_tail) ;; wallet_id, public_key, extensions
     .end_cell());
 
   commit();
