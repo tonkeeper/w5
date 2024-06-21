@@ -15,6 +15,7 @@ const int error::invalid_signature = 35;
 const int error::invalid_seqno = 33;
 const int error::invalid_wallet_id = 34;
 const int error::expired = 36;
+const int error::invalid_message_type = 47;
 
 const int size::bool = 1;
 const int size::seqno = 32;
@@ -26,16 +27,15 @@ const int size::signature = 512;
 const int size::message_type_prefix = 32;
 const int size::address_hash_size = 256;
 
+const int signed_external = 0x7369676E;
+const int signed_internal = 0x73696E74;
+
 () return_if(int condition) impure asm "IFRET";
 () return_unless(int condition) impure asm "IFNOTRET";
 
 (slice, int) begin_parse_raw(cell c) asm "XCTOS";
 
-cell preload_dict(slice s) asm "PLDDICT";
-
-slice enforce_and_remove_signed_external_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
-(slice, int) check_and_remove_signed_internal_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
 
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
@@ -180,9 +180,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 }
 
 () recv_external(slice in_msg_body) impure inline {
-  slice body = in_msg_body;
-  in_msg_body = enforce_and_remove_signed_external_prefix(in_msg_body);
-  process_signed_request(body, true);
+  throw_unless(error::invalid_message_type, in_msg_body.preload_uint(size::message_type_prefix) == signed_external);
+  process_signed_request(in_msg_body, true);
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -220,11 +219,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   }
 
-  slice body = in_msg_body;
-  (_, int is_signed_internal) = check_and_remove_signed_internal_prefix(in_msg_body);
-  return_unless(is_signed_internal);
-
-  process_signed_request(body, false);
+  return_unless(in_msg_body.preload_uint(size::message_type_prefix) == signed_internal);
+  process_signed_request(in_msg_body, false);
 }
 
 ;; ------------------------------------------------------------------------------------------------
