@@ -150,17 +150,14 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   int public_key = data_slice.preload_uint(size::public_key);
 
   int is_signature_valid = check_signature(slice_hash(signed_slice), signature, public_key);
-  if (is_external) {
-    throw_if(error::signature_disabled, is_signature_disabled);
-    throw_unless( error::invalid_signature, is_signature_valid);
-  } else {
-    if (is_signature_disabled) {
-      return ();
-    }
-    ifnot (is_signature_valid) {
+  ifnot (is_signature_valid) {
+    if (is_external) {
+      throw_unless(error::invalid_signature, is_signature_valid);
+    } else {
       return ();
     }
   }
+  throw_if(error::signature_disabled, is_signature_disabled);
   throw_unless(error::invalid_seqno, seqno == stored_seqno);
   throw_unless(error::invalid_wallet_id, wallet_id == stored_wallet_id);
   throw_if(error::expired, valid_until <= now());

@@ -1193,7 +1193,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt2.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(0);
+        ).toEqual(32);
 
         expect(receipt2.transactions).not.toHaveTransaction({
             from: walletV5.address,
