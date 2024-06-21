@@ -195,9 +195,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
   return_if(count_trailing_ones(message_flags_slice));
 
-  (in_msg_body, int is_extension_action) = check_and_remove_extension_action_prefix(in_msg_body);
-
-  if (is_extension_action) {
+  if (in_msg_body~check_and_remove_extension_action_prefix()) {
 
     ;; Authenticate extension by its address.
     (int sender_address_wc, int sender_address_hash) = parse_std_addr(in_msg_full_slice~load_msg_addr());
