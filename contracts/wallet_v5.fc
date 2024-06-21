@@ -29,8 +29,6 @@ const int size::address_hash_size = 256;
 () return_if(int condition) impure asm "IFRET";
 () return_unless(int condition) impure asm "IFNOTRET";
 
-slice udict_get_or_return(cell dict, int key_length, int index) impure asm(index dict key_length) "DICTUGET" "IFNOTRET";
-
 (slice, int) begin_parse_raw(cell c) asm "XCTOS";
 
 slice enforce_and_remove_signed_external_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
@@ -127,7 +125,6 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   }
   ;; Simply set the C5 register with all pre-computed actions after verification:
   set_c5_actions(cs.preload_ref().verify_c5_actions(is_external));
-  return ();
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -189,7 +186,6 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   slice body = in_msg_body;
   in_msg_body = enforce_and_remove_signed_external_prefix(in_msg_body);
   process_signed_request(body, true);
-  return();
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -219,7 +215,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-    extensions.udict_get_or_return(size::address_hash_size, sender_address_hash);
+    (_, int extension_found) = extensions.udict_get?(size::address_hash_size, sender_address_hash);
+    return_unless(extension_found);
 
     process_actions(in_msg_body, false);
     return ();
@@ -231,8 +228,6 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   return_unless(is_signed_internal);
 
   process_signed_request(body, false);
-  return ();
-
 }
 
 ;; ------------------------------------------------------------------------------------------------
