@@ -6,9 +6,9 @@ const int error::invalid_c5_action = 37;
 const int error::extension_wrong_workchain = 45;
 const int error::add_extension_error = 39;
 const int error::remove_extension_error = 40;
-const int error::disable_signature_when_extensions_is_empty = 44;
+const int error::disable_signature_when_extensions_is_empty = 42;
 const int error::this_signature_mode_already_set = 43;
-const int error::remove_last_extension_when_signature_disabled = 42;
+const int error::remove_last_extension_when_signature_disabled = 44;
 const int error::unspported_action = 41;
 const int error::signature_disabled = 32;
 const int error::invalid_signature = 35;
@@ -100,7 +100,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       } else { ;; Remove extension
         (extensions, int is_success) = extensions.udict_delete?(size::address_hash_size, address_hash);
         throw_unless(error::remove_extension_error, is_success);
-        throw_if(error::disable_signature_when_extensions_is_empty, null?(extensions) & (~ is_signature_allowed));
+        throw_if(error::remove_last_extension_when_signature_disabled, null?(extensions) & (~ is_signature_allowed));
       }
 
       set_data(begin_cell()
@@ -118,12 +118,12 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       slice data_tail = data_slice; ;; seqno, wallet_id, public_key, extensions
       ifnot (allow_signature) { ;; disallow
         int is_extensions_not_empty = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key).preload_uint(1);
-        throw_unless(error::remove_last_extension_when_signature_disabled, is_extensions_not_empty);
+        throw_unless(error::disable_signature_when_extensions_is_empty, is_extensions_not_empty);
       }
 
       set_data(begin_cell()
         .store_int(is_signature_allowed, size::bool)
-        .store_slice(data_tail) ;; wallet_id, public_key, extensions
+        .store_slice(data_tail) ;; seqno, wallet_id, public_key, extensions
         .end_cell());
     } else {
       throw(error::unspported_action);
