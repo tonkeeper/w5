@@ -79,7 +79,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
       slice data_slice = get_data().begin_parse();
       slice data_slice_before_extensions = data_slice~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-      int is_signature_disabled = data_slice_before_extensions.preload_int(size::bool);
+      int is_signature_allowed = data_slice_before_extensions.preload_int(size::bool);
       cell extensions = data_slice.preload_dict();
 
       ;; Add extension
@@ -89,7 +89,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       } else { ;; Remove extension
         (extensions, int is_success) = extensions.udict_delete?(size::address_hash_size, address_hash);
         throw_unless(error::remove_extension_error, is_success);
-        throw_if(error::disable_signature_when_extensions_is_empty, null?(extensions) & is_signature_disabled);
+        throw_if(error::disable_signature_when_extensions_is_empty, null?(extensions) & (~ is_signature_allowed));
       }
 
       set_data(begin_cell()
@@ -100,22 +100,20 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     } elseif (cs~check_and_remove_set_signature_allowed_prefix()) {
       int allow_signature = cs~load_int(1);
       slice data_slice = get_data().begin_parse();
-      int is_signature_disabled = data_slice~load_int(size::bool);
-      int stored_seqno = data_slice~load_uint(size::seqno);
-      slice data_tail = data_slice; ;; wallet_id, public_key, extensions
+      int is_signature_allowed = data_slice~load_int(size::bool);
+      slice data_tail = data_slice; ;; seqno, wallet_id, public_key, extensions
       if (allow_signature) { ;; allow
-        throw_unless(error::this_signature_mode_already_set, is_signature_disabled);
-        is_signature_disabled = false;
+        throw_if(error::this_signature_mode_already_set, is_signature_allowed);
+        is_signature_allowed = true;
       } else { ;; disallow
-        throw_if(error::this_signature_mode_already_set, is_signature_disabled);
-        data_slice = data_slice.skip_bits(size::wallet_id + size::public_key);
+        throw_unless(error::this_signature_mode_already_set, is_signature_allowed);
+        data_slice = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key);
         int is_extensions_not_empty = data_slice.preload_uint(1);
         throw_unless(error::remove_last_extension_when_signature_disabled, is_extensions_not_empty);
-        is_signature_disabled = true;
+        is_signature_allowed = false;
       }
       set_data(begin_cell()
-        .store_int(is_signature_disabled, size::bool)
-        .store_uint(stored_seqno, size::seqno)
+        .store_int(is_signature_allowed, size::bool)
         .store_slice(data_tail) ;; wallet_id, public_key, extensions
         .end_cell());
     } else {
@@ -142,7 +140,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   (int wallet_id, int valid_until, int seqno) = (cs~load_uint(size::wallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::seqno));
 
   slice data_slice = get_data().begin_parse();
-  int is_signature_disabled = data_slice~load_int(size::bool);
+  int is_signature_allowed = data_slice~load_int(size::bool);
 
   int stored_seqno = data_slice~load_uint(size::seqno);
   slice data_tail = data_slice; ;; wallet_id, public_key, extensions
@@ -157,7 +155,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       return ();
     }
   }
-  throw_if(error::signature_disabled, is_signature_disabled);
+  throw_unless(error::signature_disabled, is_signature_allowed);
   throw_unless(error::invalid_seqno, seqno == stored_seqno);
   throw_unless(error::invalid_wallet_id, wallet_id == stored_wallet_id);
   throw_if(error::expired, valid_until <= now());
@@ -169,7 +167,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
-    .store_int(false, size::bool)
+    .store_int(true, size::bool) ;; is_signature_allowed
     .store_uint(stored_seqno, size::seqno)
     .store_slice(data_tail) ;; wallet_id, public_key, extensions
     .end_cell());
@@ -250,5 +248,5 @@ cell get_extensions() method_id {
 }
 
 int get_is_signature_auth_allowed() method_id {
-  return ~ get_data().begin_parse().preload_int(size::bool);
+  return get_data().begin_parse().preload_int(size::bool);
 }

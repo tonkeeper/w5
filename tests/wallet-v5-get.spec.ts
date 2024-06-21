@@ -31,7 +31,7 @@ describe('Wallet V5 get methods', () => {
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
-                    signature_auth_disabled: params?.signature_auth_disabled ?? false,
+                    signatureAllowed: true,
                     seqno: params?.seqno ?? 0,
                     walletId: params?.walletId ?? WALLET_ID.serialized,
                     publicKey: params?.publicKey ?? keypair.publicKey,

@@ -68,7 +68,7 @@ describe('Wallet V5 extensions auth', () => {
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
-                    signature_auth_disabled: false,
+                    signatureAllowed: true,
                     seqno: 0,
                     walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,

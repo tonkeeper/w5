@@ -51,7 +51,7 @@ describe('Wallet V5 sign auth internal', () => {
         const _walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
-                    signature_auth_disabled: params?.signature_auth_disabled ?? false,
+                    signatureAllowed: true,
                     seqno: params?.seqno ?? 0,
                     walletId: params?.walletId ?? WALLET_ID.serialized,
                     publicKey: params?.publicKey ?? _keypair.publicKey,
@@ -94,7 +94,7 @@ describe('Wallet V5 sign auth internal', () => {
         walletV5 = blockchain.openContract(
             WalletV5.createFromConfig(
                 {
-                    signature_auth_disabled: false,
+                    signatureAllowed: true,
                     seqno: 0,
                     walletId: WALLET_ID.serialized,
                     publicKey: keypair.publicKey,
