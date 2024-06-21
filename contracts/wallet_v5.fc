@@ -9,28 +9,28 @@ const int size::public_key = 256;
 const int size::valid_until = 32;
 const int size::message_flags = 4;
 
-() return_if(int cond) impure asm "IFRET";
-() return_unless(int cond) impure asm "IFNOTRET";
+() return_if(int condition) impure asm "IFRET";
+() return_unless(int condition) impure asm "IFNOTRET";
 
-slice udict_get_or_return(cell dict, int key_len, int index) impure asm(index dict key_len) "DICTUGET" "IFNOTRET";
+slice udict_get_or_return(cell dict, int key_length, int index) impure asm(index dict key_length) "DICTUGET" "IFNOTRET";
 
-(slice, int) begin_parse_xc(cell c) asm "XCTOS";
+(slice, int) begin_parse_raw(cell c) asm "XCTOS";
 
-slice enforce_and_remove_sign_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
-(slice, int) check_and_remove_extn_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
-(slice, int) check_and_remove_sint_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
+slice enforce_and_remove_signed_external_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
+(slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
+(slice, int) check_and_remove_signed_internal_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
 
 ;; (slice, int) check_and_remove_set_data_prefix(slice body) impure asm "x{1ff8ea0b} SDBEGINSQ";
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
-(slice, int) check_and_remove_set_signature_auth_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
+(slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
 
 slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
 ;; Extensible wallet contract v5
 
 ;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
-() set_actions(cell action_list) impure asm "c5 POP";
+() set_c5_actions(cell action_list) impure asm "c5 POP";
 
 int count_leading_zeroes(slice cs) asm "SDCNTLEAD0";
 int count_trailing_zeroes(slice cs) asm "SDCNTTRAIL0";
@@ -42,19 +42,19 @@ int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
 slice get_last_bits(slice s, int n) asm "SDCUTLAST";
 slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
 
-cell verify_actions(cell c5, int is_external) inline {
+cell verify_c5_actions(cell c5, int is_external) inline {
   ;; Comment out code starting from here to disable checks (unsafe version)
   ;; {-
-  (slice c5s, _) = c5.begin_parse_xc();
-  return_if(c5s.slice_empty?());
+  (slice cs, _) = c5.begin_parse_raw();
+  return_if(cs.slice_empty?());
   do {
     ;; only send_msg is allowed, set_code or reserve_currency are not
-    c5s = c5s.enforce_and_remove_action_send_msg_prefix();
+    cs = cs.enforce_and_remove_action_send_msg_prefix();
     ;; enforce that send_mode has 2 bit set
     ;; for that load 7 bits and make sure that they end with 1
-    throw_if(37, is_external & count_trailing_zeroes(c5s.preload_bits(7)));
-    (c5s, _) = c5s.preload_ref().begin_parse_xc();
-  } until (c5s.slice_empty?());
+    throw_if(37, is_external & count_trailing_zeroes(cs.preload_bits(7)));
+    (cs, _) = cs.preload_ref().begin_parse_raw();
+  } until (cs.slice_empty?());
   ;; -}
   return c5;
 }
@@ -62,64 +62,64 @@ cell verify_actions(cell c5, int is_external) inline {
 ;; Dispatches already authenticated request.
 ;; this function is explicitly included as an inline reference - not completely inlined
 ;; completely inlining it causes undesirable code split and noticeable gas increase in some paths
-() dispatch_complex_request(slice cs, int is_external) impure inline_ref {
+() process_actions(slice cs, int is_external) impure inline_ref {
 
   ;; Recurse into extended actions until we reach standard actions
   while (cs~load_int(1)) {
-    int is_add_ext? = cs~check_and_remove_add_extension_prefix();
-    int is_del_ext? = is_add_ext? ? 0 : cs~check_and_remove_remove_extension_prefix();
+    int is_add_extension = cs~check_and_remove_add_extension_prefix();
+    int is_remove_extension = is_add_extension ? 0 : cs~check_and_remove_remove_extension_prefix();
     ;; Add/remove extensions
-    if (is_add_ext? | is_del_ext?) {
-      (int wc, int hash) = parse_std_addr(cs~load_msg_addr());
-      (int my_wc, _) = parse_std_addr(my_address());
+    if (is_add_extension | is_remove_extension) {
+      (int address_wc, int address_hash) = parse_std_addr(cs~load_msg_addr());
+      (int my_address_wc, _) = parse_std_addr(my_address());
 
-      throw_unless(45, my_wc == wc);
+      throw_unless(45, my_address_wc == address_wc);
 
-      slice ds = get_data().begin_parse();
-      slice data_bits = ds~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-      int signature_auth_disabled = data_bits.preload_int(size::bool);
-      cell extensions = ds.preload_dict();
+      slice data_slice = get_data().begin_parse();
+      slice data_slice_before_extensions = data_slice~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
+      int is_signature_disabled = data_slice_before_extensions.preload_int(size::bool);
+      cell extensions = data_slice.preload_dict();
 
       ;; Add extension
-      if (is_add_ext?) {
-        (extensions, int success?) = extensions.udict_add_builder?(256, hash, begin_cell().store_int(wc,8));
-        throw_unless(39, success?);
+      if (is_add_extension) {
+        (extensions, int is_success) = extensions.udict_add_builder?(256, address_hash, begin_cell().store_int(address_wc,8));
+        throw_unless(39, is_success);
       } else
       ;; Remove extension if (op == 0x5eaef4a4)
       ;; It can be ONLY 0x1c40db9f OR 0x5eaef4a4 here. No need for second check.
       {
-        (extensions, int success?) = extensions.udict_delete?(256, hash);
-        throw_unless(40, success?);
-        throw_if(44, null?(extensions) & (signature_auth_disabled));
+        (extensions, int is_success) = extensions.udict_delete?(256, address_hash);
+        throw_unless(40, is_success);
+        throw_if(44, null?(extensions) & is_signature_disabled);
       }
 
       set_data(begin_cell()
-              .store_slice(data_bits)
+              .store_slice(data_slice_before_extensions)
               .store_dict(extensions)
               .end_cell());
     }
-    elseif (cs~check_and_remove_set_signature_auth_allowed_prefix()) {
-      int allow? = cs~load_int(1);
-      slice ds = get_data().begin_parse();
-      int signature_auth_disabled = ds~load_int(size::bool);
-      int stored_seqno = ds~load_uint(size::seqno);
-      slice immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-      if (allow?) {
+    elseif (cs~check_and_remove_set_signature_allowed_prefix()) {
+      int allow_signature = cs~load_int(1);
+      slice data_slice = get_data().begin_parse();
+      int is_signature_disabled = data_slice~load_int(size::bool);
+      int stored_seqno = data_slice~load_uint(size::seqno);
+      slice data_tail = data_slice; ;; stored_subwallet ~ public_key ~ extensions
+      if (allow_signature) {
         ;; allow
-        throw_unless(43, signature_auth_disabled);
-        signature_auth_disabled = false;
+        throw_unless(43, is_signature_disabled);
+        is_signature_disabled = false;
       } else {
         ;; disallow
-        throw_if(43, signature_auth_disabled);
-        ds = ds.skip_bits(size::wallet_id + size::public_key);
-        int extensions_is_not_null = ds.preload_uint(1);
-        throw_unless(42, extensions_is_not_null);
-        signature_auth_disabled = true;
+        throw_if(43, is_signature_disabled);
+        data_slice = data_slice.skip_bits(size::wallet_id + size::public_key);
+        int is_extensions_not_empty = data_slice.preload_uint(1);
+        throw_unless(42, is_extensions_not_empty);
+        is_signature_disabled = true;
       }
       set_data(begin_cell()
-        .store_int(signature_auth_disabled, size::bool)
+        .store_int(is_signature_disabled, size::bool)
         .store_uint(stored_seqno, size::seqno)
-        .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
+        .store_slice(data_tail) ;; stored_subwallet ~ public_key ~ extensions
         .end_cell());
     }
     ;; Uncomment to allow set_data (for unsafe version)
@@ -136,33 +136,33 @@ cell verify_actions(cell c5, int is_external) inline {
   }
   ;; At this point we are at `action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;`
   ;; Simply set the C5 register with all pre-computed actions after verification:
-  set_actions(cs.preload_ref().verify_actions(is_external));
+  set_c5_actions(cs.preload_ref().verify_c5_actions(is_external));
   return ();
 }
 
 ;; ------------------------------------------------------------------------------------------------
 
 ;; Verifies signed request, prevents replays and proceeds with `dispatch_request`.
-() process_signed_request(slice full_body, int is_external) impure inline {
+() process_signed_request(slice in_msg_body, int is_external) impure inline {
   ifnot (is_external) {
     ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-    return_if(full_body.slice_bits() < 32 + size::bool + size::wallet_id + size::valid_until + size::seqno + 1 + 512);
+    return_if(in_msg_body.slice_bits() < 32 + size::bool + size::wallet_id + size::valid_until + size::seqno + 1 + 512);
   }
 
   ;; The precise order of operations here is VERY important. Any other order results in unneccessary stack shuffles.
-  slice signature = full_body.get_last_bits(512);
-  slice signed = full_body.remove_last_bits(512);
+  slice signature = in_msg_body.get_last_bits(512);
+  slice signed_slice = in_msg_body.remove_last_bits(512);
 
-  slice cs = signed.skip_bits(32);
-  (int subwallet_id, int valid_until, int msg_seqno) = (cs~load_uint(size::wallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::seqno));
+  slice cs = signed_slice.skip_bits(32); ;; skip signed_internal or signer_external prefix
+  (int wallet_id, int valid_until, int seqno) = (cs~load_uint(size::wallet_id), cs~load_uint(size::valid_until), cs~load_uint(size::seqno));
 
-  slice ds = get_data().begin_parse();
-  int signature_auth_disabled = ds~load_int(size::bool);
+  slice data_slice = get_data().begin_parse();
+  int is_signature_disabled = data_slice~load_int(size::bool);
 
-  int stored_seqno = ds~load_uint(size::seqno);
-  slice immutable_tail = ds; ;; stored_subwallet ~ public_key ~ extensions
-  int stored_subwallet = ds~load_uint(size::wallet_id);
-  int public_key = ds.preload_uint(size::public_key);
+  int stored_seqno = data_slice~load_uint(size::seqno);
+  slice data_tail = data_slice; ;; stored_subwallet ~ public_key ~ extensions
+  int stored_wallet_id = data_slice~load_uint(size::wallet_id);
+  int public_key = data_slice.preload_uint(size::public_key);
 
   ;; Note on bouncing/nonbouncing behaviour:
   ;; In principle, the wallet should not bounce incoming messages as to avoid
@@ -173,20 +173,20 @@ cell verify_actions(cell c5, int is_external) inline {
   ;; but failing with exception (therefore bouncing) after the signature check.
 
   ;; TODO: Consider moving signed into separate ref, slice_hash consumes 500 gas just like cell creation!
-  int signature_is_valid = check_signature(slice_hash(signed), signature, public_key);
+  int is_signature_valid = check_signature(slice_hash(signed_slice), signature, public_key);
   if (is_external) {
-    throw_if(32, signature_auth_disabled);
-    throw_unless(35, signature_is_valid);
+    throw_if(32, is_signature_disabled);
+    throw_unless(35, is_signature_valid);
   } else {
-    if (signature_auth_disabled) {
-      return();
+    if (is_signature_disabled) {
+      return ();
     }
-    ifnot (signature_is_valid) {
-      return();
+    ifnot (is_signature_valid) {
+      return ();
     }
   }
-  throw_unless(33, msg_seqno == stored_seqno);
-  throw_unless(34, subwallet_id == stored_subwallet);
+  throw_unless(33, seqno == stored_seqno);
+  throw_unless(34, wallet_id == stored_wallet_id);
   throw_if(36, valid_until <= now());
 
   if (is_external) {
@@ -198,37 +198,37 @@ cell verify_actions(cell c5, int is_external) inline {
   set_data(begin_cell()
     .store_int(false, size::bool) ;; it cannot be true, otherwise execution would not get here
     .store_uint(stored_seqno, size::seqno)
-    .store_slice(immutable_tail) ;; stored_subwallet ~ public_key ~ extensions
+    .store_slice(data_tail) ;; stored_subwallet ~ public_key ~ extensions
     .end_cell());
 
   commit();
 
-  dispatch_complex_request(cs, is_external);
+  process_actions(cs, is_external);
 }
 
-() recv_external(slice body) impure inline {
-  slice full_body = body;
+() recv_external(slice in_msg_body) impure inline {
+  slice body = in_msg_body;
   ;; 0x7369676E ("sign") external message authenticated by signature
-  body = enforce_and_remove_sign_prefix(body);
-  process_signed_request(full_body, true);
+  in_msg_body = enforce_and_remove_signed_external_prefix(in_msg_body);
+  process_signed_request(body, true);
   return();
 }
 
 ;; ------------------------------------------------------------------------------------------------
 
-() recv_internal(cell full_msg, slice body) impure inline {
+() recv_internal(cell in_msg_full, slice in_msg_body) impure inline {
 
   ;; return right away if there are no references
   ;; correct messages always have a ref, because any code paths ends with preload_ref
-  return_if(body.slice_refs_empty?());
+  return_if(in_msg_body.slice_refs_empty?());
 
   ;; Any attempt to postpone msg_value deletion will result in s2 POP -> SWAP change. No use at all.
-  slice full_msg_slice = full_msg.begin_parse();
+  slice in_msg_full_slice = in_msg_full.begin_parse();
 
-  slice s_flags = full_msg_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
+  slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddressInt ...
 
   ;; If bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
-  return_if(count_trailing_ones(s_flags));
+  return_if(count_trailing_ones(message_flags_slice));
 
   ;; slicy_return_if_bounce(begin_cell().store_uint(3, 4).end_cell().begin_parse()); ;; TEST!!!
 
@@ -236,36 +236,36 @@ cell verify_actions(cell c5, int is_external) inline {
   ;; - 0x6578746E "extn" authenticated by extension
   ;; - 0x73696E74 "sint" internal message authenticated by signature
 
-  (body, int is_extn?) = check_and_remove_extn_prefix(body); ;; 0x6578746E ("extn")
+  (in_msg_body, int is_extension_action) = check_and_remove_extension_action_prefix(in_msg_body); ;; 0x6578746E ("extn")
 
   ;; IFJMPREF because unconditionally returns inside
-  if (is_extn?) { ;; "extn" authenticated by extension
+  if (is_extension_action) { ;; "extn" authenticated by extension
 
     ;; Authenticate extension by its address.
-    (int sender_wc, int sender_hash) = parse_std_addr(full_msg_slice~load_msg_addr()); ;; no PLDMSGADDR exists
-    (int my_wc, _) = parse_std_addr(my_address());
+    (int sender_address_wc, int sender_address_hash) = parse_std_addr(in_msg_full_slice~load_msg_addr()); ;; no PLDMSGADDR exists
+    (int my_address_wc, _) = parse_std_addr(my_address());
 
-    return_unless(my_wc == sender_wc);
+    return_unless(my_address_wc == sender_address_wc);
 
-    slice ds = get_data().begin_parse();
+    slice data_slice = get_data().begin_parse();
     ;; It is not required to read this data here, maybe ext is doing simple transfer where those are not needed
-    cell extensions = ds.skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key).preload_dict();
+    cell extensions = data_slice.skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key).preload_dict();
 
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
-    extensions.udict_get_or_return(256, sender_hash); ;; kindof ifnot (success?) { return(); }
+    extensions.udict_get_or_return(256, sender_address_hash); ;; kindof ifnot (success?) { return(); }
 
-    dispatch_complex_request(body, false);
+    process_actions(in_msg_body, false);
     return ();
 
   }
 
-  slice full_body = body;
-  (_, int is_sint?) = check_and_remove_sint_prefix(body); ;; 0x73696E74 ("sint") - sign internal
-  return_unless(is_sint?);
+  slice body = in_msg_body;
+  (_, int is_signed_internal) = check_and_remove_signed_internal_prefix(in_msg_body); ;; 0x73696E74 ("sint") - sign internal
+  return_unless(is_signed_internal);
 
   ;; Process the rest of the slice just like the signed request.
-  process_signed_request(full_body, false);
+  process_signed_request(body, false);
   return (); ;; Explicit returns escape function faster and const less gas (suddenly!)
 
 }
@@ -283,15 +283,15 @@ int get_wallet_id() method_id {
 }
 
 int get_public_key() method_id {
-  slice cs = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id);
-  return cs.preload_uint(size::public_key);
+  slice data_slice = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id);
+  return data_slice.preload_uint(size::public_key);
 }
 
 ;; Returns raw dictionary (or null if empty) where keys are packed addresses and the `wc` is stored in leafs.
 ;; User should unpack the address using the same packing function using `wc` to restore the original address.
 cell get_extensions() method_id {
-  slice ds = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-  return ds~load_dict();
+  slice data_slice = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
+  return data_slice~load_dict();
 }
 
 int get_is_signature_auth_allowed() method_id {
