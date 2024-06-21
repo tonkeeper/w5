@@ -2,6 +2,20 @@
 
 #include "imports/stdlib.fc";
 
+const int error::invalid_c5_action = 37;
+const int error::extension_wrong_workchain = 45;
+const int error::add_extension_error = 39;
+const int error::remove_extension_error = 40;
+const int error::disable_signature_when_extensions_is_empty = 44;
+const int error::this_signature_mode_already_set = 43;
+const int error::remove_last_extension_when_signature_disabled = 42;
+const int error::unspported_action = 41;
+const int error::signature_disabled = 32;
+const int error::invalid_signature = 35;
+const int error::invalid_seqno = 33;
+const int error::invalid_wallet_id = 34;
+const int error::expired = 36;
+
 const int size::bool = 1;
 const int size::seqno = 32;
 const int size::wallet_id = 80;
@@ -46,7 +60,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; only send_msg is allowed, set_code or reserve_currency are not
     cs = cs.enforce_and_remove_action_send_msg_prefix();
     ;; enforce that send_mode has 2 bit set, for that load 7 bits and make sure that they end with 1
-    throw_if(37, is_external & count_trailing_zeroes(cs.preload_bits(7)));
+    throw_if(error::invalid_c5_action, is_external & count_trailing_zeroes(cs.preload_bits(7)));
     (cs, _) = cs.preload_ref().begin_parse_raw();
   } until (cs.slice_empty?());
 
@@ -63,7 +77,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       (int address_wc, int address_hash) = parse_std_addr(cs~load_msg_addr());
       (int my_address_wc, _) = parse_std_addr(my_address());
 
-      throw_unless(45, my_address_wc == address_wc);
+      throw_unless(error::extension_wrong_workchain, my_address_wc == address_wc);
 
       slice data_slice = get_data().begin_parse();
       slice data_slice_before_extensions = data_slice~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
@@ -73,11 +87,11 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       ;; Add extension
       if (is_add_extension) {
         (extensions, int is_success) = extensions.udict_add_builder?(size::address_hash_size, address_hash, begin_cell().store_int(address_wc,8));
-        throw_unless(39, is_success);
+        throw_unless( error::add_extension_error, is_success);
       } else { ;; Remove extension
         (extensions, int is_success) = extensions.udict_delete?(size::address_hash_size, address_hash);
-        throw_unless(40, is_success);
-        throw_if(44, null?(extensions) & is_signature_disabled);
+        throw_unless(error::remove_extension_error, is_success);
+        throw_if(error::disable_signature_when_extensions_is_empty, null?(extensions) & is_signature_disabled);
       }
 
       set_data(begin_cell()
@@ -92,13 +106,13 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       int stored_seqno = data_slice~load_uint(size::seqno);
       slice data_tail = data_slice; ;; stored_subwallet ~ public_key ~ extensions
       if (allow_signature) { ;; allow
-        throw_unless(43, is_signature_disabled);
+        throw_unless(error::this_signature_mode_already_set, is_signature_disabled);
         is_signature_disabled = false;
       } else { ;; disallow
-        throw_if(43, is_signature_disabled);
+        throw_if(error::this_signature_mode_already_set, is_signature_disabled);
         data_slice = data_slice.skip_bits(size::wallet_id + size::public_key);
         int is_extensions_not_empty = data_slice.preload_uint(1);
-        throw_unless(42, is_extensions_not_empty);
+        throw_unless(error::remove_last_extension_when_signature_disabled, is_extensions_not_empty);
         is_signature_disabled = true;
       }
       set_data(begin_cell()
@@ -107,7 +121,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
         .store_slice(data_tail) ;; stored_subwallet ~ public_key ~ extensions
         .end_cell());
     } else {
-      throw(41); ;; unsupported action
+      throw(error::unspported_action);
     }
     cs = cs.preload_ref().begin_parse();
   }
@@ -140,8 +154,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   int is_signature_valid = check_signature(slice_hash(signed_slice), signature, public_key);
   if (is_external) {
-    throw_if(32, is_signature_disabled);
-    throw_unless(35, is_signature_valid);
+    throw_if(error::signature_disabled, is_signature_disabled);
+    throw_unless( error::invalid_signature, is_signature_valid);
   } else {
     if (is_signature_disabled) {
       return ();
@@ -150,9 +164,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       return ();
     }
   }
-  throw_unless(33, seqno == stored_seqno);
-  throw_unless(34, wallet_id == stored_wallet_id);
-  throw_if(36, valid_until <= now());
+  throw_unless(error::invalid_seqno, seqno == stored_seqno);
+  throw_unless(error::invalid_wallet_id, wallet_id == stored_wallet_id);
+  throw_if(error::expired, valid_until <= now());
 
   if (is_external) {
     accept_message();
