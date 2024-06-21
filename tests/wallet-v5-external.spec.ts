@@ -208,14 +208,14 @@ describe('Wallet V5 sign auth external', () => {
         const extensions = await walletV5.getExtensions();
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             extensions
         );
 
         expect(extensionsDict.size).toEqual(1);
 
-        const storedWC = extensionsDict.get(packAddress(testExtension));
-        expect(storedWC).toEqual(BigInt(testExtension.workChain));
+        const dictValue = extensionsDict.get(packAddress(testExtension));
+        expect(dictValue).toEqual(-1n);
     });
 
     it('Send single transfers to a deployed wallet', async () => {
@@ -328,7 +328,7 @@ describe('Wallet V5 sign auth external', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
 
@@ -336,10 +336,10 @@ describe('Wallet V5 sign auth external', () => {
         accountForGas(receipt.transactions);
 
         expect(extensionsDict.get(packAddress(testExtension1))).toEqual(
-            BigInt(testExtension1.workChain)
+            -1n
         );
         expect(extensionsDict.get(packAddress(testExtension2))).toEqual(
-            BigInt(testExtension2.workChain)
+           -1n
         );
     });
 
@@ -350,19 +350,19 @@ describe('Wallet V5 sign auth external', () => {
         const receipt1 = await walletV5.sendExternalSignedMessage(createBody(actionsList1));
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict1.size).toEqual(1);
         expect(extensionsDict1.get(packAddress(testExtension))).toEqual(
-            BigInt(testExtension.workChain)
+            -1n
         );
 
         const actionsList2 = packActionsList([new ActionRemoveExtension(testExtension)]);
         const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
         const extensionsDict2 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
 
@@ -413,12 +413,12 @@ describe('Wallet V5 sign auth external', () => {
         accountForGas(receipt1.transactions);
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict1.size).toEqual(1);
         expect(extensionsDict1.get(packAddress(testExtension))).toEqual(
-            BigInt(testExtension.workChain)
+            -1n
         );
 
         const actionsList2 = packActionsList([new ActionAddExtension(testExtension)]);
@@ -433,12 +433,12 @@ describe('Wallet V5 sign auth external', () => {
 
         const extensionsDict2 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict2.size).toEqual(1);
         expect(extensionsDict2.get(packAddress(testExtension))).toEqual(
-            BigInt(testExtension.workChain)
+            -1n
         );
     });
 
@@ -457,7 +457,7 @@ describe('Wallet V5 sign auth external', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict.size).toEqual(0);
@@ -769,14 +769,14 @@ describe('Wallet V5 sign auth external', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
 
         expect(extensionsDict.size).toEqual(1);
 
         expect(extensionsDict.get(packAddress(testExtension))).toEqual(
-            BigInt(testExtension.workChain)
+            -1n
         );
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
@@ -917,14 +917,14 @@ describe('Wallet V5 sign auth external', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
 
         expect(extensionsDict.size).toEqual(1);
 
         expect(extensionsDict.get(packAddress(testExtension))).toEqual(
-            BigInt(testExtension.workChain)
+            -1n
         );
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();

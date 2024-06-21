@@ -86,7 +86,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
       ;; Add extension
       if (is_add_extension) {
-        (extensions, int is_success) = extensions.udict_add_builder?(size::address_hash_size, address_hash, begin_cell().store_int(address_wc,8));
+        (extensions, int is_success) = extensions.udict_add_builder?(size::address_hash_size, address_hash, begin_cell().store_int(-1, 1));
         throw_unless( error::add_extension_error, is_success);
       } else { ;; Remove extension
         (extensions, int is_success) = extensions.udict_delete?(size::address_hash_size, address_hash);

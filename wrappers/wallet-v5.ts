@@ -28,7 +28,7 @@ export function walletV5ConfigToCell(config: WalletV5Config): Cell {
         .storeUint(config.seqno, 32)
         .storeUint(config.walletId, 80)
         .storeBuffer(config.publicKey, 32)
-        .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
+        .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(1))
         .endCell();
 }
 
@@ -228,12 +228,12 @@ export class WalletV5 implements Contract {
 
         const dict: Dictionary<bigint, bigint> = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             extensions
         );
 
         return dict.keys().map(key => {
-            const wc = dict.get(key)!;
+            const wc = 0n;
             const addressHex = key;
             return Address.parseRaw(`${wc}:${addressHex.toString(16).padStart(64, '0')}`);
         });

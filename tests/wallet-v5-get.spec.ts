@@ -112,16 +112,16 @@ describe('Wallet V5 get methods', () => {
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8)
+            Dictionary.Values.BigInt(1)
         );
-        extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
-        extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
+        extensions.set(packAddress(plugin1), -1n);
+        extensions.set(packAddress(plugin2), -1n);
 
         await deploy({ extensions });
 
         const actual = await walletV5.getExtensions();
         const expected = beginCell()
-            .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(8))
+            .storeDictDirect(extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(1))
             .endCell();
         expect(actual?.equals(expected)).toBeTruthy();
     });
@@ -135,11 +135,11 @@ describe('Wallet V5 get methods', () => {
 
         const extensions: Dictionary<bigint, bigint> = Dictionary.empty(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8)
+            Dictionary.Values.BigInt(1)
         );
-        extensions.set(packAddress(plugin1), BigInt(plugin1.workChain));
-        extensions.set(packAddress(plugin2), BigInt(plugin2.workChain));
-        extensions.set(packAddress(plugin3), BigInt(plugin3.workChain));
+        extensions.set(packAddress(plugin1), -1n);
+        extensions.set(packAddress(plugin2), -1n);
+        extensions.set(packAddress(plugin3), -1n);
 
         await deploy({ extensions });
 

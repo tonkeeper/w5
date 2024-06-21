@@ -197,17 +197,17 @@ describe('Wallet V5 extensions auth', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
 
         expect(extensionsDict.size).toEqual(2);
 
         expect(extensionsDict.get(packAddress(sender.address!))).toEqual(
-            BigInt(sender.address!.workChain)
+            -1n
         );
         expect(extensionsDict.get(packAddress(testOtherExtension))).toEqual(
-            BigInt(testOtherExtension.workChain)
+            -1n
         );
     });
 
@@ -230,15 +230,15 @@ describe('Wallet V5 extensions auth', () => {
 
         const extensionsDict1 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict1.size).toEqual(2);
         expect(extensionsDict1.get(packAddress(sender.address!))).toEqual(
-            BigInt(sender.address!.workChain)
+            -1n
         );
         expect(extensionsDict1.get(packAddress(otherExtension))).toEqual(
-            BigInt(otherExtension.workChain)
+            -1n
         );
 
         const actions2 = packActionsList([new ActionRemoveExtension(otherExtension)]);
@@ -252,12 +252,12 @@ describe('Wallet V5 extensions auth', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict.size).toEqual(1);
         expect(extensionsDict.get(packAddress(sender.address!))).toEqual(
-            BigInt(sender.address!.workChain)
+            -1n
         );
         expect(extensionsDict.get(packAddress(otherExtension))).toEqual(undefined);
     });
@@ -279,7 +279,7 @@ describe('Wallet V5 extensions auth', () => {
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(8),
+            Dictionary.Values.BigInt(1),
             await walletV5.getExtensions()
         );
         expect(extensionsDict.size).toEqual(0);
