@@ -31,6 +31,8 @@ const int size::address_hash_size = 256;
 
 (slice, int) begin_parse_raw(cell c) asm "XCTOS";
 
+cell preload_dict(slice s) asm "PLDDICT";
+
 slice enforce_and_remove_signed_external_prefix(slice body) impure asm "x{7369676E} SDBEGINS";
 (slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 (slice, int) check_and_remove_signed_internal_prefix(slice body) impure asm "x{73696E74} SDBEGINSQ";
@@ -244,7 +246,7 @@ int get_public_key() method_id {
 ;; Returns raw dictionary (or null if empty) where keys are address hashes. Workchains of extensions are same with wallet smart contract workchain
 cell get_extensions() method_id {
   slice data_slice = get_data().begin_parse().skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
-  return data_slice~load_dict();
+  return data_slice.preload_dict();
 }
 
 int get_is_signature_auth_allowed() method_id {
