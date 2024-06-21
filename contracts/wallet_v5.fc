@@ -33,15 +33,11 @@ const int signed_internal = 0x73696E74;
 () return_if(int condition) impure asm "IFRET";
 () return_unless(int condition) impure asm "IFNOTRET";
 
-(slice, int) begin_parse_raw(cell c) asm "XCTOS";
-
 (slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
-
-slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
 
 int count_trailing_zeroes(slice cs) asm "SDCNTTRAIL0";
 int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
@@ -49,7 +45,16 @@ int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
 slice get_last_bits(slice s, int n) asm "SDCUTLAST";
 slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
 
-;; Stores pre-computed list of actions (mostly `action_send_msg`) in the actions register.
+
+(slice, int) begin_parse_raw(cell c) asm "XCTOS";
+
+;; `action_send_msg` has 0x0ec3c86d prefix
+;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
+slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
+
+;; Put raw list of OutActions to C5 register.
+;; OutList TLB-schema - https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L378
+;; C5 register - https://docs.ton.org/tvm.pdf, page 11
 () set_c5_actions(cell action_list) impure asm "c5 POP";
 
 cell verify_c5_actions(cell c5, int is_external) inline {
@@ -57,10 +62,14 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   return_if(cs.slice_empty?());
 
   do {
-    ;; only send_msg is allowed, set_code or reserve_currency are not
+    ;; only `action_send_msg` is allowed, `action_set_code` or `action_reserve_currency` are not
     cs = cs.enforce_and_remove_action_send_msg_prefix();
-    ;; enforce that send_mode has 2 bit set, for that load 7 bits and make sure that they end with 1
+
+    ;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
+    ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
+    ;; enforce that send_mode has +2 bit (ignore errors) set for external message. For that load 7 bits and make sure that they end with 1
     throw_if(error::invalid_c5_action, is_external & count_trailing_zeroes(cs.preload_bits(7)));
+
     (cs, _) = cs.preload_ref().begin_parse_raw();
   } until (cs.slice_empty?());
 
@@ -141,7 +150,6 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   slice data_slice = get_data().begin_parse();
   int is_signature_allowed = data_slice~load_int(size::bool);
-
   int stored_seqno = data_slice~load_uint(size::seqno);
   slice data_tail = data_slice; ;; wallet_id, public_key, extensions
   int stored_wallet_id = data_slice~load_uint(size::wallet_id);
