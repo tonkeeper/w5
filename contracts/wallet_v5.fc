@@ -65,11 +65,8 @@ slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c8
 
 cell verify_c5_actions(cell c5, int is_external) inline {
   (slice cs, _) = c5.begin_parse_raw();
-  if (cs.slice_empty?()) {
-    return c5;
-  }
 
-  do {
+  while (~ cs.slice_empty?()) {
     ;; only `action_send_msg` is allowed, `action_set_code` or `action_reserve_currency` are not
     cs = cs.enforce_and_remove_action_send_msg_prefix();
 
@@ -79,7 +76,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     throw_if(error::invalid_c5_action, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
 
     (cs, _) = cs.preload_ref().begin_parse_raw();
-  } until (cs.slice_empty?());
+  }
 
   return c5;
 }
@@ -201,7 +198,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   slice in_msg_full_slice = in_msg_full.begin_parse();
   slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
   ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
-  return_if(count_trailing_ones(message_flags_slice) > 0);
+  return_if(count_trailing_ones(message_flags_slice));
 
   if (in_msg_body~check_and_remove_extension_action_prefix()) {
 
