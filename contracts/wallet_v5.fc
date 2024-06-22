@@ -65,7 +65,9 @@ slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c8
 
 cell verify_c5_actions(cell c5, int is_external) inline {
   (slice cs, _) = c5.begin_parse_raw();
-  return_if(cs.slice_empty?());
+  if (cs.slice_empty?()) {
+    return c5;
+  }
 
   do {
     ;; only `action_send_msg` is allowed, `action_set_code` or `action_reserve_currency` are not
