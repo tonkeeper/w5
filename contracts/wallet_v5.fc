@@ -51,9 +51,6 @@ slice get_last_bits(slice s, int l) asm "SDCUTLAST";
 ;;; returns all but the last 0 ≤ l ≤ 1023 bits of s.
 slice remove_last_bits(slice s, int l) asm "SDSKIPLAST";
 
-
-(slice, int) begin_parse_raw(cell c) asm "XCTOS";
-
 ;; `action_send_msg` has 0x0ec3c86d prefix
 ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
 slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c86d} SDBEGINS";
@@ -63,6 +60,10 @@ slice enforce_and_remove_action_send_msg_prefix(slice body) impure asm "x{0ec3c8
 ;; C5 register - https://docs.ton.org/tvm.pdf, page 11
 () set_c5_actions(cell action_list) impure asm "c5 POP";
 
+;; XCTOS doesn't automatically load exotic cells (unlike CTOS `begin_parse`). We use it in `verify_c5_actions` because during action phase processing exotic cells in c5 won't be unfolded too.
+;;; transforms an ordinary or exotic cell into a Slice, as if it were an ordinary cell. A flag is returned indicating whether c is exotic. If that be the case, its type can later be deserialized from the first eight bits of s.
+(slice, int) begin_parse_raw(cell c) asm "XCTOS";
+
 cell verify_c5_actions(cell c5, int is_external) inline {
   (slice cs, _) = c5.begin_parse_raw();
 
@@ -70,9 +71,12 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; only `action_send_msg` is allowed, `action_set_code` or `action_reserve_currency` are not
     cs = cs.enforce_and_remove_action_send_msg_prefix();
 
+    ;; enforce that send_mode has +2 bit (ignore errors) set for external message.
+    ;; if such send_mode is not set and sending fails at the action phase (for example due to insufficient balance) then the seqno will not be increased and the external message will be processed again and again.
+
     ;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
     ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
-    ;; enforce that send_mode has +2 bit (ignore errors) set for external message. For that load 7 bits and make sure that they end with 1
+    ;; load 7 bits and make sure that they end with 1
     throw_if(error::invalid_c5_action, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
 
     (cs, _) = cs.preload_ref().begin_parse_raw();
