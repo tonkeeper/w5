@@ -203,7 +203,7 @@ export class WalletV5 implements Contract {
     async getIsSignatureAuthAllowed(provider: ContractProvider) {
         const state = await provider.getState();
         if (state.state.type === 'active') {
-            let res = await provider.get('get_is_signature_auth_allowed', []);
+            let res = await provider.get('is_signature_allowed', []);
             return res.stack.readNumber();
         } else {
             return -1;

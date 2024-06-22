@@ -237,7 +237,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 ;; ------------------------------------------------------------------------------------------------
 ;; Get methods
 
-int get_is_signature_auth_allowed() method_id {
+int is_signature_allowed() method_id {
   return get_data().begin_parse()
     .preload_int(size::bool);
 }
