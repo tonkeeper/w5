@@ -39,11 +39,15 @@ const int signed_internal = 0x73696E74;
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
 
-int count_trailing_zeroes(slice cs) asm "SDCNTTRAIL0";
-int count_trailing_ones(slice cs) asm "SDCNTTRAIL1";
+;;; returns the number of trailing zeroes in slice s.
+int count_trailing_zeroes(slice s) asm "SDCNTTRAIL0";
+;;; returns the number of trailing ones in slice s.
+int count_trailing_ones(slice s) asm "SDCNTTRAIL1";
 
-slice get_last_bits(slice s, int n) asm "SDCUTLAST";
-slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
+;;; returns the last 0 ≤ l ≤ 1023 bits of s.
+slice get_last_bits(slice s, int l) asm "SDCUTLAST";
+;;; returns all but the last 0 ≤ l ≤ 1023 bits of s.
+slice remove_last_bits(slice s, int l) asm "SDSKIPLAST";
 
 
 (slice, int) begin_parse_raw(cell c) asm "XCTOS";
@@ -68,7 +72,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
     ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
     ;; enforce that send_mode has +2 bit (ignore errors) set for external message. For that load 7 bits and make sure that they end with 1
-    throw_if(error::invalid_c5_action, is_external & count_trailing_zeroes(cs.preload_bits(7)));
+    throw_if(error::invalid_c5_action, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
 
     (cs, _) = cs.preload_ref().begin_parse_raw();
   } until (cs.slice_empty?());
@@ -117,7 +121,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
       slice data_tail = data_slice; ;; seqno, wallet_id, public_key, extensions
       ifnot (allow_signature) { ;; disallow
-        int is_extensions_not_empty = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key).preload_uint(1);
+        int is_extensions_not_empty = data_slice.skip_bits(size::seqno + size::wallet_id + size::public_key).preload_int(1);
         throw_unless(error::disable_signature_when_extensions_is_empty, is_extensions_not_empty);
       }
 
@@ -153,7 +157,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   int is_signature_valid = check_signature(slice_hash(signed_slice), signature, public_key);
   ifnot (is_signature_valid) {
     if (is_external) {
-      throw_unless(error::invalid_signature, is_signature_valid);
+      throw(error::invalid_signature);
     } else {
       return ();
     }
@@ -193,7 +197,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   slice in_msg_full_slice = in_msg_full.begin_parse();
   slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
   ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
-  return_if(count_trailing_ones(message_flags_slice));
+  return_if(count_trailing_ones(message_flags_slice) > 0);
 
   if (in_msg_body~check_and_remove_extension_action_prefix()) {
 
