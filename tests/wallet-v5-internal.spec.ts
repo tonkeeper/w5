@@ -865,7 +865,7 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
-        expect(receipt.transactions.length).toEqual(2);
+        expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
 
         expect(
             (
@@ -889,7 +889,7 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
-        expect(receipt.transactions.length).toEqual(2);
+        expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
 
         expect(
             (
@@ -1091,7 +1091,7 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
-        expect(receipt.transactions.length).toEqual(2);
+        expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
         accountForGas(receipt.transactions);
 
         expect(
@@ -1120,7 +1120,7 @@ describe('Wallet V5 sign auth internal', () => {
             body: createBody(actionsList)
         });
 
-        expect(receipt.transactions.length).toEqual(2);
+        expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
         accountForGas(receipt.transactions);
 
         expect(

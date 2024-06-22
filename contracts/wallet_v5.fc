@@ -180,7 +180,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     .store_slice(data_tail) ;; wallet_id, public_key, extensions
     .end_cell());
 
-  commit();
+  if (is_external) {
+    commit();
+  }
 
   process_actions(cs, is_external);
 }
