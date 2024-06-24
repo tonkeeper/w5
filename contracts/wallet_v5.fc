@@ -26,6 +26,7 @@ const int size::message_flags = 4;
 const int size::signature = 512;
 const int size::message_type_prefix = 32;
 const int size::address_hash_size = 256;
+const int size::query_id = 64;
 
 const int prefix::signed_external = 0x7369676E;
 const int prefix::signed_internal = 0x73696E74;
@@ -224,6 +225,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     (_, int extension_found) = extensions.udict_get?(size::address_hash_size, sender_address_hash);
     return_unless(extension_found);
+
+    in_msg_body~skip_bits(size::query_id); ;; skip query_id
 
     process_actions(in_msg_body, false);
     return ();

@@ -159,6 +159,7 @@ export class WalletV5 implements Contract {
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
                 .storeUint(Opcodes.auth_extension, 32)
+                .storeUint(0, 64) // query id
                 .storeSlice(opts.body.beginParse())
                 .endCell()
         });
