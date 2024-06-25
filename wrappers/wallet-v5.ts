@@ -26,7 +26,7 @@ export function walletV5ConfigToCell(config: WalletV5Config): Cell {
     return beginCell()
         .storeBit(config.signatureAllowed)
         .storeUint(config.seqno, 32)
-        .storeUint(config.walletId, 80)
+        .storeUint(config.walletId, 32)
         .storeBuffer(config.publicKey, 32)
         .storeDict(config.extensions, Dictionary.Keys.BigUint(256), Dictionary.Values.BigInt(1))
         .endCell();
@@ -49,30 +49,30 @@ export class WalletId {
         v5: 0
     };
 
-    static deserialize(walletId: bigint | Buffer): WalletId {
-        const bitReader = new BitReader(
-            new BitString(
-                typeof walletId === 'bigint' ? Buffer.from(walletId.toString(16), 'hex') : walletId,
-                0,
-                80
-            )
-        );
-        const networkGlobalId = bitReader.loadInt(32);
-        const workChain = bitReader.loadInt(8);
-        const walletVersionRaw = bitReader.loadUint(8);
-        const subwalletNumber = bitReader.loadUint(32);
-
-        const walletVersion = Object.entries(this.versionsSerialisation).find(
-            ([_, value]) => value === walletVersionRaw
-        )?.[0] as WalletId['walletVersion'] | undefined;
-
-        if (walletVersion === undefined) {
-            throw new Error(
-                `Can't deserialize walletId: unknown wallet version ${walletVersionRaw}`
-            );
-        }
-
-        return new WalletId({ networkGlobalId, workChain, walletVersion, subwalletNumber });
+    static deserialize(walletId: bigint): WalletId {
+        // const bitReader = new BitReader(
+        //     new BitString(
+        //         typeof walletId === 'bigint' ? Buffer.from(walletId.toString(16), 'hex') : walletId,
+        //         0,
+        //         32
+        //     )
+        // );
+        // const networkGlobalId = bitReader.loadInt(32);
+        // const workChain = bitReader.loadInt(8);
+        // const walletVersionRaw = bitReader.loadUint(8);
+        const subwalletNumber = walletId;
+        //
+        // const walletVersion = Object.entries(this.versionsSerialisation).find(
+        //     ([_, value]) => value === walletVersionRaw
+        // )?.[0] as WalletId['walletVersion'] | undefined;
+        //
+        // if (walletVersion === undefined) {
+        //     throw new Error(
+        //         `Can't deserialize walletId: unknown wallet version ${walletVersionRaw}`
+        //     );
+        // }
+        //
+        return new WalletId({ networkGlobalId: 0, workChain: 0, walletVersion: 'v5', subwalletNumber: Number(walletId) });
     }
 
     readonly walletVersion: 'v5';
@@ -97,13 +97,13 @@ export class WalletId {
         this.subwalletNumber = args?.subwalletNumber ?? 0;
         this.walletVersion = args?.walletVersion ?? 'v5';
 
-        const bitBuilder = new BitBuilder(80);
-        bitBuilder.writeInt(this.networkGlobalId, 32);
-        bitBuilder.writeInt(this.workChain, 8);
-        bitBuilder.writeUint(WalletId.versionsSerialisation[this.walletVersion], 8);
-        bitBuilder.writeUint(this.subwalletNumber, 32);
+        // const bitBuilder = new BitBuilder(32);
+        // bitBuilder.writeInt(this.networkGlobalId, 32);
+        // bitBuilder.writeInt(this.workChain, 8);
+        // bitBuilder.writeUint(WalletId.versionsSerialisation[this.walletVersion], 8);
+        // bitBuilder.writeUint(this.subwalletNumber, 32);
 
-        this.serialized = bufferToBigInt(bitBuilder.buffer());
+        this.serialized = BigInt(this.subwalletNumber) // bufferToBigInt(bitBuilder.buffer());
     }
 }
 

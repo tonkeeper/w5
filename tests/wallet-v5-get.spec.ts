@@ -79,7 +79,7 @@ describe('Wallet V5 get methods', () => {
         });
         await deploy({ walletId: expectedWalletId.serialized });
         const actualWalletId = await walletV5.getWalletId();
-        expect(expectedWalletId.serialized).toEqual(actualWalletId.serialized);
+        expect(expectedWalletId.subwalletNumber).toEqual(actualWalletId.subwalletNumber);
     });
 
     it('Get subwallet number', async () => {

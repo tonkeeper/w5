@@ -45,7 +45,7 @@ describe('Wallet V5 extensions auth', () => {
     function createBody(actionsList: Cell) {
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())

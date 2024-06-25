@@ -19,7 +19,7 @@ const int error::invalid_message_type = 47;
 
 const int size::bool = 1;
 const int size::seqno = 32;
-const int size::wallet_id = 80;
+const int size::wallet_id = 32;
 const int size::public_key = 256;
 const int size::valid_until = 32;
 const int size::message_flags = 4;

@@ -71,7 +71,7 @@ describe('Wallet V5 sign auth internal', () => {
     function createBody(actionsList: Cell) {
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -471,14 +471,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(vu, 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
             .endCell();
 
         const fakePayload = beginCell()
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(vu, 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -523,7 +523,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -577,7 +577,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -622,7 +622,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(Math.round(Date.now() / 1000) - 600, 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -667,7 +667,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 80)
+            .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -712,7 +712,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell() // auth_signed used instead of auth_signed_internal
             .storeUint(Opcodes.auth_signed, 32)
-            .storeUint(WALLET_ID.serialized, 80)
+            .storeUint(WALLET_ID.serialized, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
