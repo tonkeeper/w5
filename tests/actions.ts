@@ -18,31 +18,31 @@ export class ActionSendMsg {
 }
 
 export class ActionAddExtension {
-    public static readonly tag = 0x1c40db9f;
+    public static readonly tag = 0x02;
 
     public readonly tag = ActionAddExtension.tag;
 
     constructor(public readonly address: Address) {}
 
     public serialize(): Cell {
-        return beginCell().storeUint(this.tag, 32).storeAddress(this.address).endCell();
+        return beginCell().storeUint(this.tag, 8).storeAddress(this.address).endCell();
     }
 }
 
 export class ActionRemoveExtension {
-    public static readonly tag = 0x5eaef4a4;
+    public static readonly tag = 0x03;
 
     public readonly tag = ActionRemoveExtension.tag;
 
     constructor(public readonly address: Address) {}
 
     public serialize(): Cell {
-        return beginCell().storeUint(this.tag, 32).storeAddress(this.address).endCell();
+        return beginCell().storeUint(this.tag, 8).storeAddress(this.address).endCell();
     }
 }
 
 export class ActionSetSignatureAuthAllowed {
-    public static readonly tag = 0x20cbb95a;
+    public static readonly tag = 0x04;
 
     public readonly tag = ActionSetSignatureAuthAllowed.tag;
 
@@ -50,7 +50,7 @@ export class ActionSetSignatureAuthAllowed {
 
     public serialize(): Cell {
         return beginCell()
-            .storeUint(this.tag, 32)
+            .storeUint(this.tag, 8)
             .storeUint(this.allowed ? 1 : 0, 1)
             .endCell();
     }

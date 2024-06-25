@@ -186,7 +186,7 @@ describe('Wallet V5 sign auth internal', () => {
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const addExtensionAction = beginCell()
-            .storeUint(Opcodes.action_extended_add_extension, 32)
+            .storeUint(Opcodes.action_extended_add_extension, 8)
             .storeAddress(testExtension)
             .endCell();
 

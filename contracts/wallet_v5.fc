@@ -38,9 +38,9 @@ const int prefix::signed_internal = 0x73696E74;
 
 (slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
-(slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{1c40db9f} SDBEGINSQ";
-(slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{5eaef4a4} SDBEGINSQ";
-(slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{20cbb95a} SDBEGINSQ";
+(slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{02} SDBEGINSQ";
+(slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{03} SDBEGINSQ";
+(slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{04} SDBEGINSQ";
 
 ;;; returns the number of trailing zeroes in slice s.
 int count_trailing_zeroes(slice s) asm "SDCNTTRAIL0";
