@@ -89,8 +89,18 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 }
 
 () process_actions(slice cs, int is_external) impure inline_ref {
+  cell c5_actions = cs~load_maybe_ref();
+  if (~ cell_null?(c5_actions)) {
+    ;; Simply set the C5 register with all pre-computed actions after verification:
+    set_c5_actions(c5_actions.verify_c5_actions(is_external));
+  }
+  int has_other_actions = cs~load_int(1);
+  if (~ has_other_actions) {
+    return ();
+  }
+
   ;; Loop extended actions until we reach standard actions
-  while (cs~load_int(1)) {
+  while (true) {
     int is_add_extension = cs~check_and_remove_add_extension_prefix();
     int is_remove_extension = is_add_extension ? 0 : cs~check_and_remove_remove_extension_prefix();
     ;; Add/remove extensions
@@ -140,10 +150,11 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     } else {
       throw(error::unspported_action);
     }
+    if (cs.slice_refs() == 0) {
+      return ();
+    }
     cs = cs.preload_ref().begin_parse();
   }
-  ;; Simply set the C5 register with all pre-computed actions after verification:
-  set_c5_actions(cs.preload_ref().verify_c5_actions(is_external));
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -202,7 +213,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 ;; ------------------------------------------------------------------------------------------------
 
 () recv_internal(cell in_msg_full, slice in_msg_body) impure inline {
-  return_if(in_msg_body.slice_refs_empty?()); ;; message with actions always have a ref
+  ;; return_if(in_msg_body.slice_refs_empty?()); ;; message with actions always have a ref todo
 
   slice in_msg_full_slice = in_msg_full.begin_parse();
   slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
