@@ -16,6 +16,7 @@ const int error::invalid_seqno = 33;
 const int error::invalid_wallet_id = 34;
 const int error::expired = 36;
 const int error::invalid_message_type = 47;
+const int error::only_extension_can_change_signature_mode = 48;
 
 const int size::bool = 1;
 const int size::seqno = 32;
@@ -88,7 +89,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   return c5;
 }
 
-() process_actions(slice cs, int is_external) impure inline_ref {
+() process_actions(slice cs, int is_external, int is_extension) impure inline_ref {
   cell c5_actions = cs~load_maybe_ref();
   if (~ cell_null?(c5_actions)) {
     ;; Simply set the C5 register with all pre-computed actions after verification:
@@ -131,6 +132,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
               .end_cell());
 
     } elseif (cs~check_and_remove_set_signature_allowed_prefix()) {
+      throw_unless(error::only_extension_can_change_signature_mode, is_extension);
       int allow_signature = cs~load_int(1);
       slice data_slice = get_data().begin_parse();
       int is_signature_allowed = data_slice~load_int(size::bool);
@@ -159,7 +161,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
 ;; ------------------------------------------------------------------------------------------------
 
-() process_signed_request(slice in_msg_body, int is_external) impure inline {
+() process_signed_request(slice in_msg_body, int is_external, int is_extension) impure inline {
   slice signature = in_msg_body.get_last_bits(size::signature);
   slice signed_slice = in_msg_body.remove_last_bits(size::signature);
 
@@ -202,12 +204,12 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     commit();
   }
 
-  process_actions(cs, is_external);
+  process_actions(cs, is_external, is_external);
 }
 
 () recv_external(slice in_msg_body) impure inline {
   throw_unless(error::invalid_message_type, in_msg_body.preload_uint(size::message_type_prefix) == prefix::signed_external);
-  process_signed_request(in_msg_body, true);
+  process_signed_request(in_msg_body, true, false);
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -239,7 +241,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
     in_msg_body~skip_bits(size::query_id); ;; skip query_id
 
-    process_actions(in_msg_body, false);
+    process_actions(in_msg_body, false, true);
     return ();
 
   }
@@ -247,7 +249,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   return_unless(in_msg_body.preload_uint(size::message_type_prefix) == prefix::signed_internal);
   ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
   return_if(in_msg_body.slice_bits() < size::message_type_prefix + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature);
-  process_signed_request(in_msg_body, false);
+  process_signed_request(in_msg_body, false, false);
 }
 
 ;; ------------------------------------------------------------------------------------------------
