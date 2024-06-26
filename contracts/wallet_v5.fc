@@ -148,7 +148,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     } else {
       throw(error::unspported_action);
     }
-    return_unless(cs.slice_refs());
+    ifnot (cs.slice_refs()) {
+      return ();
+    }
     cs = cs.preload_ref().begin_parse();
   }
 }
