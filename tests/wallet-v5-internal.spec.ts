@@ -140,13 +140,13 @@ describe('Wallet V5 sign auth internal', () => {
             .endCell();
 
         const actionsList = beginCell()
-            .storeUint(0, 1)
-            .storeRef(
+            .storeMaybeRef(
                 beginCell()
                     .storeRef(beginCell().endCell())
                     .storeSlice(sendTxactionAction.beginParse())
                     .endCell()
             )
+            .storeUint(0, 1) // no other actions
             .endCell();
 
         if (config.microscope)
@@ -191,8 +191,8 @@ describe('Wallet V5 sign auth internal', () => {
             .endCell();
 
         const actionsList = beginCell()
+            .storeUint(0, 1) // no c5 actions
             .storeUint(1, 1)
-            .storeRef(beginCell().storeUint(0, 1).storeRef(beginCell().endCell()).endCell())
             .storeSlice(addExtensionAction.beginParse())
             .endCell();
 
@@ -856,13 +856,21 @@ describe('Wallet V5 sign auth internal', () => {
 
     it('Should fail disallowing signature auth with no exts', async () => {
         const actionsList = packActionsList([
-            new ActionSetSignatureAuthAllowed(false)
+            new ActionAddExtension(sender.address!)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
+        await walletV5.sendInternal(sender, {
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             value: toNano(0.1),
             body: createBody(actionsList)
+        });
+
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: packActionsList([
+                new ActionRemoveExtension(sender.address!),
+                new ActionSetSignatureAuthAllowed(false)
+            ])
         });
 
         expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
@@ -879,14 +887,21 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should fail allowing signature auth when allowed', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const actionsList = packActionsList([
             new ActionSetSignatureAuthAllowed(true)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
@@ -903,6 +918,14 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should add ext and disallow signature auth', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
@@ -910,10 +933,9 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSetSignatureAuthAllowed(false)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(2);
@@ -926,7 +948,7 @@ describe('Wallet V5 sign auth internal', () => {
             await walletV5.getExtensions()
         );
 
-        expect(extensionsDict.size).toEqual(1);
+        expect(extensionsDict.size).toEqual(2);
 
         expect(extensionsDict.get(packAddress(testExtension))).toEqual(
             -1n
@@ -947,16 +969,23 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should add ext and disallow signature auth in separate txs', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
             new ActionAddExtension(testExtension)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(2);
@@ -969,7 +998,7 @@ describe('Wallet V5 sign auth internal', () => {
             await walletV5.getExtensions()
         );
 
-        expect(extensionsDict.size).toEqual(1);
+        expect(extensionsDict.size).toEqual(2);
 
         expect(extensionsDict.get(packAddress(testExtension))).toEqual(
             -1n
@@ -989,10 +1018,9 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSetSignatureAuthAllowed(false)
         ]);
 
-        const receipt2 = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList2)
+        const receipt2 = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList2
         });
 
         expect(receipt2.transactions.length).toEqual(2);
@@ -1014,6 +1042,14 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
@@ -1022,11 +1058,9 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSetSignatureAuthAllowed(true),
             new ActionRemoveExtension(testExtension),
         ]);
-
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(2);
@@ -1077,18 +1111,26 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should fail removing last extension with signature auth disabled', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
             new ActionAddExtension(testExtension),
             new ActionSetSignatureAuthAllowed(false),
-            new ActionRemoveExtension(testExtension)
+            new ActionRemoveExtension(testExtension),
+            new ActionRemoveExtension(sender.address!)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
@@ -1106,6 +1148,14 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should fail disallowing signature auth twice in tx', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
@@ -1114,10 +1164,9 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSetSignatureAuthAllowed(false)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(3); // sender_wallet -> wallet_v5 -> bounced
@@ -1135,6 +1184,14 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should add ext, disallow sig auth; fail different signed tx', async () => {
+        await walletV5.sendInternal(sender, {
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            value: toNano(0.1),
+            body: createBody(packActionsList([
+                new ActionAddExtension(sender.address!)
+            ]))
+        });
+
         const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
 
         const actionsList = packActionsList([
@@ -1142,10 +1199,9 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSetSignatureAuthAllowed(false)
         ]);
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            value: toNano(0.1),
-            body: createBody(actionsList)
+        const receipt = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: actionsList
         });
 
         expect(receipt.transactions.length).toEqual(2);
@@ -1157,7 +1213,7 @@ describe('Wallet V5 sign auth internal', () => {
             await walletV5.getExtensions()
         );
 
-        expect(extensionsDict.size).toEqual(1);
+        expect(extensionsDict.size).toEqual(2);
 
         expect(extensionsDict.get(packAddress(testExtension))).toEqual(
             -1n

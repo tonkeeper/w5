@@ -212,7 +212,7 @@ export class WalletV5 implements Contract {
     }
 
     async getWalletId(provider: ContractProvider) {
-        const result = await provider.get('get_wallet_id', []);
+        const result = await provider.get('get_subwallet_id', []);
         return WalletId.deserialize(result.stack.readBigNumber());
     }
 

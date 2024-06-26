@@ -89,21 +89,47 @@ function packActionsListOut(actions: (OutAction | ExtendedAction)[]): Cell {
         .endCell();
 }
 
-function packActionsListExtended(actions: (OutAction | ExtendedAction)[]): Cell {
-    const [action, ...rest] = actions;
-
-    if (!action || !isExtendedAction(action)) {
-        return beginCell()
-            .storeUint(0, 1)
-            .storeRef(packActionsListOut(actions.slice().reverse())) // tvm handles actions from c5 in reversed order
-            .endCell();
+function packExtendedActions(extendedActions: ExtendedAction[]): Cell {
+    const first = extendedActions[0];
+    const rest = extendedActions.slice(1);
+    let builder = beginCell()
+        .storeSlice(first.serialize().beginParse());
+    if (rest.length > 0) {
+        builder = builder.storeRef(packExtendedActions(extendedActions.slice(1)));
     }
+    return builder.endCell();
+}
 
-    return beginCell()
-        .storeUint(1, 1)
-        .storeSlice(action.serialize().beginParse())
-        .storeRef(packActionsListExtended(rest))
-        .endCell();
+function packActionsListExtended(actions: (OutAction | ExtendedAction)[]): Cell {
+    const extendedActions: ExtendedAction[] = [];
+    const outActions: OutAction[] = [];
+    actions.forEach(action => {
+        if (isExtendedAction(action)) {
+            extendedActions.push(action);
+        } else {
+            outActions.push(action);
+        }
+    });
+
+    let builder = beginCell();
+    if (outActions.length === 0) {
+        builder = builder.storeUint(0, 1);
+    } else {
+        builder = builder.storeMaybeRef(packActionsListOut(outActions.slice().reverse()));
+    }
+    if (extendedActions.length === 0) {
+        builder = builder.storeUint(0, 1);
+    } else {
+        const first = extendedActions[0];
+        const rest = extendedActions.slice(1);
+        builder = builder
+            .storeUint(1, 1)
+            .storeSlice(first.serialize().beginParse());
+        if (rest.length > 0) {
+            builder = builder.storeRef(packExtendedActions(rest));
+        }
+    }
+    return builder.endCell();
 }
 
 export function packActionsList(actions: (OutAction | ExtendedAction)[]): Cell {

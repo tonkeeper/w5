@@ -147,13 +147,13 @@ describe('Wallet V5 sign auth external', () => {
             .endCell();
 
         const actionsList = beginCell()
-            .storeUint(0, 1)
-            .storeRef(
+            .storeMaybeRef(
                 beginCell()
-                    .storeRef(beginCell().endCell())
+                    .storeRef(beginCell().endCell()) // empty child - end of action list
                     .storeSlice(sendTxactionAction.beginParse())
                     .endCell()
             )
+            .storeUint(0, 1) // no other_actions
             .endCell();
 
         if (config.microscope)
@@ -195,8 +195,8 @@ describe('Wallet V5 sign auth external', () => {
             .endCell();
 
         const actionsList = beginCell()
-            .storeUint(1, 1)
-            .storeRef(beginCell().storeUint(0, 1).storeRef(beginCell().endCell()).endCell())
+            .storeUint(0, 1) // no c5 actions
+            .storeUint(1, 1) // have other actions
             .storeSlice(addExtensionAction.beginParse())
             .endCell();
 
@@ -693,7 +693,7 @@ describe('Wallet V5 sign auth external', () => {
         expect(walletBalanceBefore).toEqual(walletBalanceAfter);
     });
 
-    it('Should fail disallowing signature auth with no exts', async () => {
+    it('only_extension_can_change_signature_mode', async () => {
         const actionsList = packActionsList([
             new ActionSetSignatureAuthAllowed(false)
         ]);
@@ -704,237 +704,237 @@ describe('Wallet V5 sign auth external', () => {
                 (receipt.transactions[0].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(42);
+        ).toEqual(46); // only_extension_can_change_signature_mode
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1);
     });
 
-    it('Should fail allowing signature auth when allowed', async () => {
-        const actionsList = packActionsList([
-            new ActionSetSignatureAuthAllowed(true)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    // it('Should fail allowing signature auth when allowed', async () => {
+    //     const actionsList = packActionsList([
+    //         new ActionSetSignatureAuthAllowed(true)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(43);
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(-1);
+    // });
 
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(43);
+    // it('Should add ext and disallow signature auth', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension),
+    //         new ActionSetSignatureAuthAllowed(false)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(0);
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(0);
+    //
+    //     const contract_seqno = await walletV5.getSeqno();
+    //     expect(contract_seqno).toEqual(seqno);
+    // });
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
-    });
-
-    it('Should add ext and disallow signature auth', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(false)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(0);
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(0);
-
-        const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno);
-    });
-
-    it('Should add ext and disallow signature auth in separate txs', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(0);
-
-        const extensionsDict = Dictionary.loadDirect(
-            Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(1),
-            await walletV5.getExtensions()
-        );
-
-        expect(extensionsDict.size).toEqual(1);
-
-        expect(extensionsDict.get(packAddress(testExtension))).toEqual(
-            -1n
-        );
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
-
-        const actionsList2 = packActionsList([
-            new ActionSetSignatureAuthAllowed(false)
-        ]);
-        const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
-        accountForGas(receipt2.transactions);
-
-        expect(
-            (
-                (receipt2.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(0);
-
-        const isSignatureAuthAllowed2 = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed2).toEqual(0);
-
-        const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno);
-    });
-
-    it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(false),
-            new ActionSetSignatureAuthAllowed(true),
-            new ActionRemoveExtension(testExtension)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(0);
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
-
-        const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno);
-
-        const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-        const forwardValue = toNano(0.001);
-
-        const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
-
-        const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
-
-        const actionsList2 = packActionsList([
-            new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
-        ]);
-
-        const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
-
-        expect(receipt2.transactions.length).toEqual(2);
-        accountForGas(receipt2.transactions);
-
-        expect(receipt2.transactions).toHaveTransaction({
-            from: walletV5.address,
-            to: testReceiver,
-            value: forwardValue
-        });
-
-        const fee = receipt2.transactions[1].totalFees.coins;
-        const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
-        expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
-    });
-
-    it('Should fail removing last extension with signature auth disabled', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(false),
-            new ActionRemoveExtension(testExtension)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(44);
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
-    });
-
-    it('Should fail disallowing signature auth twice in tx', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(false),
-            new ActionSetSignatureAuthAllowed(false)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(43);
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1); // throw when handling, packet is dropped
-    });
-
-    it('Should add ext, disallow sig auth; fail different signed tx', async () => {
-        const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
-
-        const actionsList = packActionsList([
-            new ActionAddExtension(testExtension),
-            new ActionSetSignatureAuthAllowed(false)
-        ]);
-        const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
-        accountForGas(receipt.transactions);
-
-        expect(
-            (
-                (receipt.transactions[0].description as TransactionDescriptionGeneric)
-                    .computePhase as TransactionComputeVm
-            ).exitCode
-        ).toEqual(0);
-
-        const extensionsDict = Dictionary.loadDirect(
-            Dictionary.Keys.BigUint(256),
-            Dictionary.Values.BigInt(1),
-            await walletV5.getExtensions()
-        );
-
-        expect(extensionsDict.size).toEqual(1);
-
-        expect(extensionsDict.get(packAddress(testExtension))).toEqual(
-            -1n
-        );
-
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(0);
-
-        const contract_seqno = await walletV5.getSeqno();
-        expect(contract_seqno).toEqual(seqno);
-
-        await disableConsoleError(() =>
-            expect(walletV5.sendExternalSignedMessage(createBody(packActionsList([])))).rejects.toThrow()
-        );
-    });
+    // it('Should add ext and disallow signature auth in separate txs', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(0);
+    //
+    //     const extensionsDict = Dictionary.loadDirect(
+    //         Dictionary.Keys.BigUint(256),
+    //         Dictionary.Values.BigInt(1),
+    //         await walletV5.getExtensions()
+    //     );
+    //
+    //     expect(extensionsDict.size).toEqual(1);
+    //
+    //     expect(extensionsDict.get(packAddress(testExtension))).toEqual(
+    //         -1n
+    //     );
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(-1);
+    //
+    //     const actionsList2 = packActionsList([
+    //         new ActionSetSignatureAuthAllowed(false)
+    //     ]);
+    //     const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
+    //     accountForGas(receipt2.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt2.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(0);
+    //
+    //     const isSignatureAuthAllowed2 = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed2).toEqual(0);
+    //
+    //     const contract_seqno = await walletV5.getSeqno();
+    //     expect(contract_seqno).toEqual(seqno);
+    // });
+    //
+    // it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension),
+    //         new ActionSetSignatureAuthAllowed(false),
+    //         new ActionSetSignatureAuthAllowed(true),
+    //         new ActionRemoveExtension(testExtension)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(0);
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(-1);
+    //
+    //     const contract_seqno = await walletV5.getSeqno();
+    //     expect(contract_seqno).toEqual(seqno);
+    //
+    //     const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //     const forwardValue = toNano(0.001);
+    //
+    //     const receiverBalanceBefore = (await blockchain.getContract(testReceiver)).balance;
+    //
+    //     const msg = createMsgInternal({ dest: testReceiver, value: forwardValue });
+    //
+    //     const actionsList2 = packActionsList([
+    //         new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
+    //     ]);
+    //
+    //     const receipt2 = await walletV5.sendExternalSignedMessage(createBody(actionsList2));
+    //
+    //     expect(receipt2.transactions.length).toEqual(2);
+    //     accountForGas(receipt2.transactions);
+    //
+    //     expect(receipt2.transactions).toHaveTransaction({
+    //         from: walletV5.address,
+    //         to: testReceiver,
+    //         value: forwardValue
+    //     });
+    //
+    //     const fee = receipt2.transactions[1].totalFees.coins;
+    //     const receiverBalanceAfter = (await blockchain.getContract(testReceiver)).balance;
+    //     expect(receiverBalanceAfter).toEqual(receiverBalanceBefore + forwardValue - fee);
+    // });
+    //
+    // it('Should fail removing last extension with signature auth disabled', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension),
+    //         new ActionSetSignatureAuthAllowed(false),
+    //         new ActionRemoveExtension(testExtension)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(44);
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(-1);
+    // });
+    //
+    // it('Should fail disallowing signature auth twice in tx', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension),
+    //         new ActionSetSignatureAuthAllowed(false),
+    //         new ActionSetSignatureAuthAllowed(false)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(43);
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(-1); // throw when handling, packet is dropped
+    // });
+    //
+    // it('Should add ext, disallow sig auth; fail different signed tx', async () => {
+    //     const testExtension = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
+    //
+    //     const actionsList = packActionsList([
+    //         new ActionAddExtension(testExtension),
+    //         new ActionSetSignatureAuthAllowed(false)
+    //     ]);
+    //     const receipt = await walletV5.sendExternalSignedMessage(createBody(actionsList));
+    //     accountForGas(receipt.transactions);
+    //
+    //     expect(
+    //         (
+    //             (receipt.transactions[0].description as TransactionDescriptionGeneric)
+    //                 .computePhase as TransactionComputeVm
+    //         ).exitCode
+    //     ).toEqual(0);
+    //
+    //     const extensionsDict = Dictionary.loadDirect(
+    //         Dictionary.Keys.BigUint(256),
+    //         Dictionary.Values.BigInt(1),
+    //         await walletV5.getExtensions()
+    //     );
+    //
+    //     expect(extensionsDict.size).toEqual(1);
+    //
+    //     expect(extensionsDict.get(packAddress(testExtension))).toEqual(
+    //         -1n
+    //     );
+    //
+    //     const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
+    //     expect(isSignatureAuthAllowed).toEqual(0);
+    //
+    //     const contract_seqno = await walletV5.getSeqno();
+    //     expect(contract_seqno).toEqual(seqno);
+    //
+    //     await disableConsoleError(() =>
+    //         expect(walletV5.sendExternalSignedMessage(createBody(packActionsList([])))).rejects.toThrow()
+    //     );
+    // });
 });

@@ -326,9 +326,13 @@ describe('Wallet V5 extensions auth', () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
-                new ActionAddExtension(sender.address!),
-                new ActionSetSignatureAuthAllowed(false)
+                new ActionAddExtension(sender.address!)
             ]))
+        });
+
+        const receipt0 = await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: packActionsList([new ActionSetSignatureAuthAllowed(false)])
         });
 
         const testReceiver = Address.parse('EQAvDfWFG0oYX19jwNDNBBL1rKNT9XfaGP9HyTb5nb2Eml6y');
@@ -362,9 +366,15 @@ describe('Wallet V5 extensions auth', () => {
         await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
-                new ActionAddExtension(sender.address!),
-                new ActionSetSignatureAuthAllowed(false)
+                new ActionAddExtension(sender.address!)
             ]))
+        });
+
+         await walletV5.sendInternalMessageFromExtension(sender, {
+            value: toNano('0.1'),
+            body: packActionsList([
+                new ActionSetSignatureAuthAllowed(false)
+            ])
         });
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
