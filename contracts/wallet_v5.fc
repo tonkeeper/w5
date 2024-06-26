@@ -72,7 +72,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   (slice cs, _) = c5.begin_parse_raw();
 
   while (~ cs.slice_empty?()) {
-    ;; only `action_send_msg` is allowed, `action_set_code` or `action_reserve_currency` are not
+    ;; only `action_send_msg` is allowed; `action_set_code`, `action_reserve_currency` or `action_change_library` are not.
     cs = cs.enforce_and_remove_action_send_msg_prefix();
 
     ;; enforce that send_mode has +2 bit (ignore errors) set for external message.
