@@ -200,7 +200,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     commit();
   }
 
-  process_actions(cs, is_external, is_external);
+  process_actions(cs, is_external, is_extension);
 }
 
 () recv_external(slice in_msg_body) impure inline {
