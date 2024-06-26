@@ -91,14 +91,11 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
 () process_actions(slice cs, int is_external, int is_extension) impure inline_ref {
   cell c5_actions = cs~load_maybe_ref();
-  if (~ cell_null?(c5_actions)) {
+  ifnot (cell_null?(c5_actions)) {
     ;; Simply set the C5 register with all pre-computed actions after verification:
     set_c5_actions(c5_actions.verify_c5_actions(is_external));
   }
-  int has_other_actions = cs~load_int(1);
-  if (~ has_other_actions) {
-    return ();
-  }
+  return_unless(cs~load_int(1)); ;; has_other_actions
 
   ;; Loop extended actions until we reach standard actions
   while (true) {
@@ -152,9 +149,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     } else {
       throw(error::unspported_action);
     }
-    if (cs.slice_refs() == 0) {
-      return ();
-    }
+    return_unless(cs.slice_refs());
     cs = cs.preload_ref().begin_parse();
   }
 }
