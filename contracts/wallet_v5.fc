@@ -7,9 +7,9 @@ const int error::invalid_seqno = 33;
 const int error::invalid_wallet_id = 34;
 const int error::invalid_signature = 35;
 const int error::expired = 36;
-const int error::invalid_c5_action = 37;
-const int error::add_extension_error = 39;
-const int error::remove_extension_error = 40;
+const int error::external_send_message_must_have_ignore_errors_send_mode = 37;
+const int error::add_extension = 39;
+const int error::remove_extension = 40;
 const int error::unspported_action = 41;
 const int error::disable_signature_when_extensions_is_empty = 42;
 const int error::this_signature_mode_already_set = 43;
@@ -81,7 +81,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
     ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
     ;; load 7 bits and make sure that they end with 1
-    throw_if(error::invalid_c5_action, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
+    throw_if(error::external_send_message_must_have_ignore_errors_send_mode, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
 
     (cs, _) = cs.preload_ref().begin_parse_raw();
   }
@@ -118,10 +118,10 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       ;; Add extension
       if (is_add_extension) {
         (extensions, int is_success) = extensions.udict_add_builder?(size::address_hash_size, address_hash, begin_cell().store_int(-1, 1));
-        throw_unless( error::add_extension_error, is_success);
+        throw_unless( error::add_extension, is_success);
       } else { ;; Remove extension
         (extensions, int is_success) = extensions.udict_delete?(size::address_hash_size, address_hash);
-        throw_unless(error::remove_extension_error, is_success);
+        throw_unless(error::remove_extension, is_success);
         int is_signature_allowed = data_slice_before_extensions.preload_int(size::bool);
         throw_if(error::remove_last_extension_when_signature_disabled, null?(extensions) & (~ is_signature_allowed));
       }
