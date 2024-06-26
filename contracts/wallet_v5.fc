@@ -32,16 +32,16 @@ const int size::query_id = 64;
 const int prefix::signed_external = 0x7369676E;
 const int prefix::signed_internal = 0x73696E74;
 
-;;; performs a RET, but only if integer f is non-zero. If f is a NaN, throws an integer overflow exception.
-() return_if(int f) impure asm "IFRET";
-;;; performs a RET, but only if integer f is zero
-() return_unless(int f) impure asm "IFNOTRET";
-
 (slice, int) check_and_remove_extension_action_prefix(slice body) impure asm "x{6578746E} SDBEGINSQ";
 
 (slice, int) check_and_remove_add_extension_prefix(slice body) impure asm "x{02} SDBEGINSQ";
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{03} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{04} SDBEGINSQ";
+
+;;; performs a RET, but only if integer f is non-zero. If f is a NaN, throws an integer overflow exception.
+() return_if(int f) impure asm "IFRET";
+;;; performs a RET, but only if integer f is zero
+() return_unless(int f) impure asm "IFNOTRET";
 
 ;;; returns the number of trailing zeroes in slice s.
 int count_trailing_zeroes(slice s) asm "SDCNTTRAIL0";
