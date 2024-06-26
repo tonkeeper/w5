@@ -2,21 +2,21 @@
 
 #include "imports/stdlib.fc";
 
+const int error::signature_disabled = 32;
+const int error::invalid_seqno = 33;
+const int error::invalid_wallet_id = 34;
+const int error::invalid_signature = 35;
+const int error::expired = 36;
 const int error::invalid_c5_action = 37;
-const int error::extension_wrong_workchain = 45;
 const int error::add_extension_error = 39;
 const int error::remove_extension_error = 40;
+const int error::unspported_action = 41;
 const int error::disable_signature_when_extensions_is_empty = 42;
 const int error::this_signature_mode_already_set = 43;
 const int error::remove_last_extension_when_signature_disabled = 44;
-const int error::unspported_action = 41;
-const int error::signature_disabled = 32;
-const int error::invalid_signature = 35;
-const int error::invalid_seqno = 33;
-const int error::invalid_wallet_id = 34;
-const int error::expired = 36;
+const int error::extension_wrong_workchain = 45;
+const int error::only_extension_can_change_signature_mode = 46;
 const int error::invalid_message_type = 47;
-const int error::only_extension_can_change_signature_mode = 48;
 
 const int size::bool = 1;
 const int size::seqno = 32;
