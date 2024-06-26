@@ -263,7 +263,7 @@ int seqno() method_id {
     .preload_uint(size::seqno);
 }
 
-int get_wallet_id() method_id {
+int get_subwallet_id() method_id {
   return get_data().begin_parse()
     .skip_bits(size::bool + size::seqno)
     .preload_uint(size::wallet_id);
