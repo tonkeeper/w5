@@ -11,7 +11,7 @@ const int error::external_send_message_must_have_ignore_errors_send_mode = 37;
 const int error::invalid_message_operation = 38;
 const int error::add_extension = 39;
 const int error::remove_extension = 40;
-const int error::unspported_action = 41;
+const int error::unsupported_action = 41;
 const int error::disable_signature_when_extensions_is_empty = 42;
 const int error::this_signature_mode_already_set = 43;
 const int error::remove_last_extension_when_signature_disabled = 44;
@@ -146,7 +146,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
         .store_slice(data_tail) ;; seqno, wallet_id, public_key, extensions
         .end_cell());
     } else {
-      throw(error::unspported_action);
+      throw(error::unsupported_action);
     }
     ifnot (cs.slice_refs()) {
       return ();
