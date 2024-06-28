@@ -37,11 +37,6 @@ const int prefix::extension_action = 0x6578746E;
 (slice, int) check_and_remove_remove_extension_prefix(slice body) impure asm "x{03} SDBEGINSQ";
 (slice, int) check_and_remove_set_signature_allowed_prefix(slice body) impure asm "x{04} SDBEGINSQ";
 
-;;; performs a RET, but only if integer f is non-zero. If f is a NaN, throws an integer overflow exception.
-() return_if(int f) impure asm "IFRET";
-;;; performs a RET, but only if integer f is zero
-() return_unless(int f) impure asm "IFNOTRET";
-
 ;;; returns the number of trailing zeroes in slice s.
 int count_trailing_zeroes(slice s) asm "SDCNTTRAIL0";
 ;;; returns the number of trailing ones in slice s.
@@ -94,7 +89,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; Simply set the C5 register with all pre-computed actions after verification:
     set_c5_actions(c5_actions.verify_c5_actions(is_external));
   }
-  return_unless(cs~load_int(1)); ;; has_other_actions
+  if (cs~load_int(1) == 0) { ;; has_other_actions
+    return ();
+  }
 
   ;; Loop extended actions until we reach standard actions
   while (true) {
@@ -212,14 +209,20 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 ;; ------------------------------------------------------------------------------------------------
 
 () recv_internal(cell in_msg_full, slice in_msg_body) impure inline {
-  return_if(in_msg_body.slice_bits() < size::message_operation_prefix);
+  if (in_msg_body.slice_bits() < size::message_operation_prefix) {
+    return ();
+  }
   int op = in_msg_body.preload_uint(size::message_operation_prefix);
-  return_unless((op == prefix::extension_action) | (op == prefix::signed_internal));
+  if ((op != prefix::extension_action) & (op != prefix::signed_internal)) {
+    return ();
+  }
 
   slice in_msg_full_slice = in_msg_full.begin_parse();
   slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
   ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
-  return_if(count_trailing_ones(message_flags_slice));
+  if (count_trailing_ones(message_flags_slice) > 0) {
+    return ();
+  }
 
   if (op == prefix::extension_action) {
     in_msg_body~skip_bits(size::message_operation_prefix);
@@ -228,7 +231,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     (int sender_address_wc, int sender_address_hash) = parse_std_addr(in_msg_full_slice~load_msg_addr());
     (int my_address_wc, _) = parse_std_addr(my_address());
 
-    return_unless(my_address_wc == sender_address_wc);
+    if (my_address_wc != sender_address_wc) {
+      return ();
+    }
 
     cell extensions = get_data().begin_parse()
       .skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key)
@@ -237,7 +242,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; Note that some random contract may have deposited funds with this prefix,
     ;; so we accept the funds silently instead of throwing an error (wallet v4 does the same).
     (_, int extension_found) = extensions.udict_get?(size::address_hash_size, sender_address_hash);
-    return_unless(extension_found);
+    ifnot (extension_found) {
+      return ();
+    }
 
     in_msg_body~skip_bits(size::query_id); ;; skip query_id
 
@@ -247,7 +254,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   }
 
   ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-  return_if(in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature);
+  if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature) {
+    return ();
+  }
   process_signed_request(in_msg_body, false, false);
 }
 
