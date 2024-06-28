@@ -370,7 +370,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(41);
+        ).toEqual(141);
     });
 
     it('Should fail SetCode action', async () => {
@@ -421,7 +421,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(39);
+        ).toEqual(139);
 
         const extensionsDict2 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
@@ -448,7 +448,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(40);
+        ).toEqual(140);
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
@@ -599,7 +599,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(33);
+        ).toEqual(133);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -644,7 +644,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(36);
+        ).toEqual(136);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -689,7 +689,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(34);
+        ).toEqual(134);
 
         expect(receipt.transactions).not.toHaveTransaction({
             from: walletV5.address,
@@ -880,7 +880,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(42);
+        ).toEqual(142);
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1);
@@ -911,7 +911,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(43);
+        ).toEqual(143);
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1);
@@ -1141,7 +1141,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(44);
+        ).toEqual(144);
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1);
@@ -1177,7 +1177,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(43);
+        ).toEqual(143);
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1); // throw when handling, packet is dropped
@@ -1249,7 +1249,7 @@ describe('Wallet V5 sign auth internal', () => {
                 (receipt2.transactions[1].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(32);
+        ).toEqual(132);
 
         expect(receipt2.transactions).not.toHaveTransaction({
             from: walletV5.address,

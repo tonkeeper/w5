@@ -386,7 +386,7 @@ describe('Wallet V5 sign auth external', () => {
                 (receipt.transactions[0].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(41);
+        ).toEqual(141);
     });
 
     it('Should fail SetCode action', async () => {
@@ -429,7 +429,7 @@ describe('Wallet V5 sign auth external', () => {
                 (receipt.transactions[0].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(39);
+        ).toEqual(139);
 
         const extensionsDict2 = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
@@ -453,7 +453,7 @@ describe('Wallet V5 sign auth external', () => {
                 (receipt.transactions[0].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(40);
+        ).toEqual(140);
 
         const extensionsDict = Dictionary.loadDirect(
             Dictionary.Keys.BigUint(256),
@@ -704,7 +704,7 @@ describe('Wallet V5 sign auth external', () => {
                 (receipt.transactions[0].description as TransactionDescriptionGeneric)
                     .computePhase as TransactionComputeVm
             ).exitCode
-        ).toEqual(46); // only_extension_can_change_signature_mode
+        ).toEqual(146); // only_extension_can_change_signature_mode
 
         const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
         expect(isSignatureAuthAllowed).toEqual(-1);

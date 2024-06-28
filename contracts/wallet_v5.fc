@@ -2,21 +2,21 @@
 
 #include "imports/stdlib.fc";
 
-const int error::signature_disabled = 32;
-const int error::invalid_seqno = 33;
-const int error::invalid_wallet_id = 34;
-const int error::invalid_signature = 35;
-const int error::expired = 36;
-const int error::external_send_message_must_have_ignore_errors_send_mode = 37;
-const int error::invalid_message_operation = 38;
-const int error::add_extension = 39;
-const int error::remove_extension = 40;
-const int error::unsupported_action = 41;
-const int error::disable_signature_when_extensions_is_empty = 42;
-const int error::this_signature_mode_already_set = 43;
-const int error::remove_last_extension_when_signature_disabled = 44;
-const int error::extension_wrong_workchain = 45;
-const int error::only_extension_can_change_signature_mode = 46;
+const int error::signature_disabled = 132;
+const int error::invalid_seqno = 133;
+const int error::invalid_wallet_id = 134;
+const int error::invalid_signature = 135;
+const int error::expired = 136;
+const int error::external_send_message_must_have_ignore_errors_send_mode = 137;
+const int error::invalid_message_operation = 138;
+const int error::add_extension = 139;
+const int error::remove_extension = 140;
+const int error::unsupported_action = 141;
+const int error::disable_signature_when_extensions_is_empty = 142;
+const int error::this_signature_mode_already_set = 143;
+const int error::remove_last_extension_when_signature_disabled = 144;
+const int error::extension_wrong_workchain = 145;
+const int error::only_extension_can_change_signature_mode = 146;
 
 const int size::bool = 1;
 const int size::seqno = 32;
