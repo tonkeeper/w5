@@ -86,7 +86,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     (cs, _) = cs.preload_ref().begin_parse_raw();
     count += 1;
   }
-  throw_unless(error::invalid_c5, count <= 254);
+  throw_unless(error::invalid_c5, count <= 255);
   throw_unless(error::invalid_c5, cs.slice_refs() == 0);
 
   return c5;
@@ -262,8 +262,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   }
 
-  ;; Additional check to make sure that there are enough bits for reading (+1 for actual actions flag)
-  if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + 1 + size::signature) {
+  ;; Additional check to make sure that there are enough bits for reading (+2 for maybe c5 and maybe other actions bits)
+  if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + 2 + size::signature) {
     return ();
   }
   process_signed_request(in_msg_body, false, false);
