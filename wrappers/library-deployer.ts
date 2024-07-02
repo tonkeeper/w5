@@ -11,8 +11,8 @@ import {
     Sender,
     SendMode,
     SimpleLibrary
-} from 'ton-core';
-import { SimpleLibraryValue } from 'ton-core/dist/types/SimpleLibrary';
+} from '@ton/core';
+import { SimpleLibraryValue } from '@ton/core/dist/types/SimpleLibrary';
 
 export type LibraryDeployerConfig = {
     libraryCode: Cell;

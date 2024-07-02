@@ -1,4 +1,4 @@
-import { Address, beginCell, Cell, MessageRelaxed, SendMode, storeMessageRelaxed } from 'ton-core';
+import { Address, beginCell, Cell, MessageRelaxed, SendMode, storeMessageRelaxed } from '@ton/core';
 import { isTestOnlyExtendedAction, TestOnlyExtendedAction, TestOnlyOutAction } from './test-only-actions';
 
 export class ActionSendMsg {

@@ -9,10 +9,18 @@ import {
     contractAddress,
     ContractProvider,
     Dictionary,
+    MessageRelaxed,
+    storeOutList,
+    OutAction,
     Sender,
-    SendMode
-} from 'ton-core';
+    SendMode,
+    Builder,
+    OutActionSendMsg,
+    toNano
+} from '@ton/core';
 import { bufferToBigInt } from '../tests/utils';
+
+import { sign } from '@ton/crypto';
 
 export type WalletV5Config = {
     signatureAllowed: boolean;
