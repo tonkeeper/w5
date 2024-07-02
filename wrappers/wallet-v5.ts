@@ -182,12 +182,7 @@ export class WalletV5 implements Contract {
     }
 
     async sendExternalSignedMessage(provider: ContractProvider, body: Cell) {
-        await provider.external(
-            beginCell()
-                // .storeUint(Opcodes.auth_signed, 32) // Is signed inside message
-                .storeSlice(body.beginParse())
-                .endCell()
-        );
+        await provider.external(body);
     }
 
     async sendExternal(provider: ContractProvider, body: Cell) {
@@ -242,7 +237,7 @@ export class WalletV5 implements Contract {
         );
 
         return dict.keys().map(key => {
-            const wc = 0n;
+            const wc = this.address.workChain;
             const addressHex = key;
             return Address.parseRaw(`${wc}:${addressHex.toString(16).padStart(64, '0')}`);
         });
