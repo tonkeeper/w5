@@ -161,7 +161,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
 ;; ------------------------------------------------------------------------------------------------
 
-() process_signed_request(slice in_msg_body, int is_external, int is_extension) impure inline {
+() process_signed_request(slice in_msg_body, int is_external) impure inline {
   slice signature = in_msg_body.get_last_bits(size::signature);
   slice signed_slice = in_msg_body.remove_last_bits(size::signature);
 
@@ -205,12 +205,12 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     commit();
   }
 
-  process_actions(cs, is_external, is_extension);
+  process_actions(cs, is_external, false);
 }
 
 () recv_external(slice in_msg_body) impure inline {
   throw_unless(error::invalid_message_operation, in_msg_body.preload_uint(size::message_operation_prefix) == prefix::signed_external);
-  process_signed_request(in_msg_body, true, false);
+  process_signed_request(in_msg_body, true);
 }
 
 ;; ------------------------------------------------------------------------------------------------
@@ -261,7 +261,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
   if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + size::signature) {
     return ();
   }
-  process_signed_request(in_msg_body, false, false);
+  process_signed_request(in_msg_body, false);
 }
 
 ;; ------------------------------------------------------------------------------------------------
