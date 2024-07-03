@@ -259,8 +259,8 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   }
 
-  ;; Additional check to make sure that there are enough bits for reading (+2 for maybe c5 and maybe other actions bits)
-  if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + 2 + size::signature) {
+  ;; Additional check to make sure that there are enough bits for reading before signature check
+  if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + size::signature) {
     return ();
   }
   process_signed_request(in_msg_body, false, false);
