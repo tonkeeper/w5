@@ -33,5 +33,9 @@
         "ts-jest": "^29.0.5",
         "ts-node": "^10.9.1",
         "typescript": "^5.5.2"
+    },
+    "overrides": {
+        "@ton-community/func-js-bin": "0.4.5-tvmbeta.3",
+        "@ton-community/func-js": "0.7.0"
     }
 }
