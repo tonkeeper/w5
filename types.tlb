@@ -20,7 +20,7 @@ signed_request$_             // 32 (opcode from outer)
 = SignedRequest;             // Total: 688 .. 976 + ^Cell
 
 internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;
-internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
+internal_extension#6578746e query_id:(## 64) inner:InnerRequest = InternalMsgBody;
 external_signed#7369676e signed:SignedRequest = ExternalMsgBody;
 
 actions$_ out_actions:(Maybe OutList) has_other_actions:(## 1) {m:#} {n:#} other_actions:(ActionList n m) = InnerRequest;
