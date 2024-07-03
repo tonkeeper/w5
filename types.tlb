@@ -12,10 +12,10 @@ action_delete_ext#5eaef4a4 addr:MsgAddressInt = ExtendedAction;
 action_set_signature_auth_allowed#20cbb95a allowed:(## 1) = ExtendedAction;
 
 signed_request$_             // 32 (opcode from outer)
-  wallet_id:    WalletID     // 80
+  wallet_id:    #            // 32
   valid_until:  #            // 32
   msg_seqno:    #            // 32
-  inner:        InnerRequest // 1 .. (1 + 32 + 256) + ^Cell
+  inner:        InnerRequest //
   signature:    bits512      // 512
 = SignedRequest;             // Total: 688 .. 976 + ^Cell
 
@@ -23,8 +23,7 @@ internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;
 internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
 external_signed#7369676e signed:SignedRequest = ExternalMsgBody;
 
-actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
+actions$_ out_actions:(Maybe OutList) has_other_actions:(## 1) {m:#} {n:#} other_actions:(ActionList n m) = InnerRequest;
 
 // Contract state
-wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:(## 32) = WalletID;
-contract_state$_ signature_auth_disabled:(## 1) seqno:# wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
+contract_state$_ is_signature_allowed:(## 1) seqno:# wallet_id:(## 32) public_key:(## 256) extensions_dict:(HashmapE 256 int1) = ContractState;
