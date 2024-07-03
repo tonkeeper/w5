@@ -1905,101 +1905,101 @@ describe('Wallet v5 external tests', () => {
                     expect(await wallet.getSeqno()).toEqual(Number(args.seqno) + 1);
                 });
             });
-            describe('Bounce', () => {
-                it('should ignore bounced mesages', async () => {
-                    await loadFrom(hasExtension);
-                    const seqNo = await wallet.getSeqno();
-                    const mockActions: WalletActions = { wallet: [message2action(mockMessage)] };
-
-                    // Note that in reality bounce gets prefixed by 0xFFFFFFFF
-                    // With current code, that would mean message would be ignored
-                    // due to op check
-                    // However we still could test as if TVM doesn't add prefix to bounce somehow
-                    const intReq = WalletV5Test.requestMessage(
-                        true,
-                        walletId,
-                        curTime() + 1000,
-                        seqNo,
-                        mockActions,
-                        keys.secretKey
-                    );
-                    const extReq = WalletV5Test.extensionMessage(mockActions);
-                    // ihr_disable and bounce flags combinations
-                    let flagFuzz = [
-                        [false, false],
-                        [true, false],
-                        [false, true],
-                        [true, true]
-                    ];
-
-                    const stateBefore = await getWalletData();
-
-                    for (let flags of flagFuzz) {
-                        let res = await blockchain.sendMessage(
-                            internal({
-                                from: owner.address,
-                                to: wallet.address,
-                                body: intReq,
-                                value: toNano('1'),
-                                bounced: true,
-                                ihrDisabled: flags[0],
-                                bounce: flags[1]
-                            })
-                        );
-                        expect(res.transactions).toHaveTransaction({
-                            on: wallet.address,
-                            op: Opcodes.auth_signed_internal,
-                            aborted: false,
-                            outMessagesCount: 0
-                        });
-                        expect(await getWalletData()).toEqualCell(stateBefore);
-
-                        res = await blockchain.sendMessage(
-                            internal({
-                                from: testExtensionBc.address,
-                                to: wallet.address,
-                                body: extReq,
-                                value: toNano('1'),
-                                bounced: true,
-                                ihrDisabled: flags[0],
-                                bounce: flags[1]
-                            })
-                        );
-                        expect(res.transactions).toHaveTransaction({
-                            on: wallet.address,
-                            op: Opcodes.auth_extension,
-                            aborted: false,
-                            outMessagesCount: 0
-                        });
-                        expect(await getWalletData()).toEqualCell(stateBefore);
-                    }
-
-                    // Let's proove that bounce flag is the reason
-                    const resInt = await blockchain.sendMessage(
-                        internal({
-                            from: owner.address,
-                            to: wallet.address,
-                            body: intReq,
-                            value: toNano('1'),
-                            ihrDisabled: true,
-                            bounce: true
-                        })
-                    );
-                    assertMockMessage(resInt.transactions);
-
-                    const resExt = await blockchain.sendMessage(
-                        internal({
-                            from: testExtensionBc.address,
-                            to: wallet.address,
-                            body: extReq,
-                            value: toNano('1'),
-                            ihrDisabled: false,
-                            bounce: false
-                        })
-                    );
-                    assertMockMessage(resExt.transactions);
-                });
-            });
+            // describe('Bounce', () => {
+            //     it('should ignore bounced mesages', async () => {
+            //         await loadFrom(hasExtension);
+            //         const seqNo = await wallet.getSeqno();
+            //         const mockActions: WalletActions = { wallet: [message2action(mockMessage)] };
+            //
+            //         // Note that in reality bounce gets prefixed by 0xFFFFFFFF
+            //         // With current code, that would mean message would be ignored
+            //         // due to op check
+            //         // However we still could test as if TVM doesn't add prefix to bounce somehow
+            //         const intReq = WalletV5Test.requestMessage(
+            //             true,
+            //             walletId,
+            //             curTime() + 1000,
+            //             seqNo,
+            //             mockActions,
+            //             keys.secretKey
+            //         );
+            //         const extReq = WalletV5Test.extensionMessage(mockActions);
+            //         // ihr_disable and bounce flags combinations
+            //         let flagFuzz = [
+            //             [false, false],
+            //             [true, false],
+            //             [false, true],
+            //             [true, true]
+            //         ];
+            //
+            //         const stateBefore = await getWalletData();
+            //
+            //         for (let flags of flagFuzz) {
+            //             let res = await blockchain.sendMessage(
+            //                 internal({
+            //                     from: owner.address,
+            //                     to: wallet.address,
+            //                     body: intReq,
+            //                     value: toNano('1'),
+            //                     bounced: true,
+            //                     ihrDisabled: flags[0],
+            //                     bounce: flags[1]
+            //                 })
+            //             );
+            //             expect(res.transactions).toHaveTransaction({
+            //                 on: wallet.address,
+            //                 op: Opcodes.auth_signed_internal,
+            //                 aborted: false,
+            //                 outMessagesCount: 0
+            //             });
+            //             expect(await getWalletData()).toEqualCell(stateBefore);
+            //
+            //             res = await blockchain.sendMessage(
+            //                 internal({
+            //                     from: testExtensionBc.address,
+            //                     to: wallet.address,
+            //                     body: extReq,
+            //                     value: toNano('1'),
+            //                     bounced: true,
+            //                     ihrDisabled: flags[0],
+            //                     bounce: flags[1]
+            //                 })
+            //             );
+            //             expect(res.transactions).toHaveTransaction({
+            //                 on: wallet.address,
+            //                 op: Opcodes.auth_extension,
+            //                 aborted: false,
+            //                 outMessagesCount: 0
+            //             });
+            //             expect(await getWalletData()).toEqualCell(stateBefore);
+            //         }
+            //
+            //         // Let's proove that bounce flag is the reason
+            //         const resInt = await blockchain.sendMessage(
+            //             internal({
+            //                 from: owner.address,
+            //                 to: wallet.address,
+            //                 body: intReq,
+            //                 value: toNano('1'),
+            //                 ihrDisabled: true,
+            //                 bounce: true
+            //             })
+            //         );
+            //         assertMockMessage(resInt.transactions);
+            //
+            //         const resExt = await blockchain.sendMessage(
+            //             internal({
+            //                 from: testExtensionBc.address,
+            //                 to: wallet.address,
+            //                 body: extReq,
+            //                 value: toNano('1'),
+            //                 ihrDisabled: false,
+            //                 bounce: false
+            //             })
+            //         );
+            //         assertMockMessage(resExt.transactions);
+            //     });
+            // });
         });
         describe('Extension', () => {
             let actionFuzz: WalletActions[];

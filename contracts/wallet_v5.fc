@@ -226,16 +226,13 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     return ();
   }
 
-  slice in_msg_full_slice = in_msg_full.begin_parse();
-  slice message_flags_slice = in_msg_full_slice~load_bits(size::message_flags); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
-  ;; skip bounced messages - if bounced flag (last bit) is set amount of trailing ones will be non-zero, else it will be zero.
-  if (count_trailing_ones(message_flags_slice) > 0) {
-    return ();
-  }
+  ;; bounded messages has 0xffffff prefix and skipped by op check
 
   if (op == prefix::extension_action) {
     in_msg_body~skip_bits(size::message_operation_prefix);
 
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    in_msg_full_slice~skip_bits(size::message_flags);
     ;; Authenticate extension by its address.
     (int sender_address_wc, int sender_address_hash) = parse_std_addr(in_msg_full_slice~load_msg_addr());
     (int my_address_wc, _) = parse_std_addr(my_address());
