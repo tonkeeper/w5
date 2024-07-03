@@ -23,7 +23,6 @@ import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
 import { ActionSetCode, ActionSetData } from './test-only-actions';
-import { WalletV4 } from '../wrappers/wallet-v4';
 
 const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: -1, subwalletNumber: 0 });
 
