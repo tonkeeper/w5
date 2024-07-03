@@ -40,8 +40,6 @@ const int prefix::extension_action = 0x6578746E;
 
 ;;; returns the number of trailing zeroes in slice s.
 int count_trailing_zeroes(slice s) asm "SDCNTTRAIL0";
-;;; returns the number of trailing ones in slice s.
-int count_trailing_ones(slice s) asm "SDCNTTRAIL1";
 
 ;;; returns the last 0 ≤ l ≤ 1023 bits of s.
 slice get_last_bits(slice s, int l) asm "SDCUTLAST";
