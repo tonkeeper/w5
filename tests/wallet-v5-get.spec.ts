@@ -1,8 +1,8 @@
-import { Blockchain, SandboxContract } from '@ton-community/sandbox';
-import { Address, beginCell, Cell, Dictionary, Sender, toNano } from 'ton-core';
+import { Blockchain, SandboxContract } from '@ton/sandbox';
+import { Address, beginCell, Cell, Dictionary, Sender, toNano } from '@ton/core';
 import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
-import '@ton-community/test-utils';
-import { compile } from '@ton-community/blueprint';
+import '@ton/test-utils';
+import { compile } from '@ton/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed } from 'ton-crypto';
 import { bufferToBigInt, packAddress } from './utils';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';

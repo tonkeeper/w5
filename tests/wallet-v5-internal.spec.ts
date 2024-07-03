@@ -1,8 +1,8 @@
-import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton-community/sandbox';
-import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from 'ton-core';
+import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton/sandbox';
+import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from '@ton/core';
 import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
-import '@ton-community/test-utils';
-import { compile } from '@ton-community/blueprint';
+import '@ton/test-utils';
+import { compile } from '@ton/blueprint';
 import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
 import { bufferToBigInt, createMsgInternal, disableConsoleError, packAddress, validUntil } from './utils';
 import {
@@ -11,8 +11,8 @@ import {
     ActionSendMsg, ActionSetSignatureAuthAllowed,
     packActionsList
 } from './actions';
-import { TransactionDescriptionGeneric } from 'ton-core/src/types/TransactionDescription';
-import { TransactionComputeVm } from 'ton-core/src/types/TransactionComputePhase';
+import { TransactionDescriptionGeneric } from '@ton/core/src/types/TransactionDescription';
+import { TransactionComputeVm } from '@ton/core/src/types/TransactionComputePhase';
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
 import { ActionSetCode, ActionSetData } from './test-only-actions';
