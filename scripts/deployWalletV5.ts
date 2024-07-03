@@ -15,6 +15,7 @@ export async function run(provider: NetworkProvider) {
     const walletV5 = provider.open(
         WalletV5.createFromConfig(
             {
+                signature_auth_disabled: false,
                 seqno: 0,
                 walletId: new WalletId({ networkGlobalId: -3 }).serialized, // testnet
                 publicKey: keypair.publicKey,

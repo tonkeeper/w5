@@ -42,7 +42,7 @@ Authentication:
 
 Operations:
 * standard "send message" action (up to 255 messages at once),
-* enable/disable signature authentication,
+* enable/disable signature authentication (can be invoked only by extension),
 * install/remove extension.
 
 Signed messages can be delivered both by external and internal messages.
@@ -111,77 +111,9 @@ When wallet contract is being deployed, original code hash is being used as the 
 Library contract itself data and code are empty cells. That leads to the inability to change the library code, delete the contract, or withdraw funds from it.
 Therefore, any Wallet V5 user can top up the library contract balance if they are afraid that the library code of their wallet will be frozen.
 
-## Wallet ID
-
-Wallet ID disambiguates requests signed with the same public key to different wallet versions (V3/V4/V5) or wallets deployed on different chains.
-
-For Wallet V5 we suggest using the following wallet ID:
-
-```
-wallet_id$_ global_id:int32 wc:int8 version:(## 8) subwallet_number:(## 32) = WalletID;
-```
-
-- `global_id` is a TON chain identifier. TON Mainnet `global_id = -239` and TON Testnet `global_id = -3`.
-- `wc` is a Workchain. -1 for Masterchain and 0 for Basechain. 
-- `version`: current version of wallet v5 is `0`.
-- `subwallet_number` can be used to get multiple wallet contracts bound to the single keypair.
-
-## Packed address
-
-To make authorize extensions efficiently we compress 260-bit address (workchain + sha256 of stateinit) into a 256-bit integer:
-
-```
-int addr = addr_hash ^ (wc + 1)
-```
-
-Previously deployed wallet v4 was packing the address into a cell which costs ≈500 gas, while access to dictionary costs approximately `120*lg2(N)` in gas, that is serialization occupies more than half of the access cost for wallets with up to 16 extensions. This design makes packing cost around 50 gas and allows cutting the authentication cost 2-3x for reasonably sized wallets.
-
-As of 2023 TON network consists of two workchains: -1 (master) and 0 (base). This means that the proposed address packing reduces second-preimage resistance of sha256 by 1 bit which we consider negligible. Even if the network is expanded with 254 more workchains in a distant future, our scheme would reduce security of extension authentication by only 8 bits down to 248 bits. Note that birthday attack is irrelevant in our setting as the user agent is not installing random extensions, although the security margin is plenty anyway (124 bits).
-
-
-
 ## TL-B definitions
 
-Action types:
-
-```tl-b
-// Standard actions from block.tlb:
-out_list_empty$_ = OutList 0;
-out_list$_ {n:#} prev:^(OutList n) action:OutAction = OutList (n + 1);
-action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
-
-// Extended actions in W5:
-action_list_basic$0 {n:#} actions:^(OutList n) = ActionList n 0;
-action_list_extended$1 {m:#} {n:#} action:ExtendedAction prev:^(ActionList n m) = ActionList n (m+1);
-
-action_add_ext#1c40db9f addr:MsgAddressInt = ExtendedAction;
-action_delete_ext#5eaef4a4 addr:MsgAddressInt = ExtendedAction;
-action_set_signature_auth_allowed#20cbb95a allowed:(## 1) = ExtendedAction;
-```
-
-Authentication modes:
-
-```tl-b
-signed_request$_             // 32 (opcode from outer)
-  wallet_id:    WalletID     // 80
-  valid_until:  #            // 32
-  msg_seqno:    #            // 32
-  inner:        InnerRequest // 1 .. (1 + 32 + 256) + ^Cell
-  signature:    bits512      // 512
-= SignedRequest;             // Total: 688 .. 976 + ^Cell
-
-internal_signed#73696e74 signed:SignedRequest = InternalMsgBody;
-internal_extension#6578746e inner:InnerRequest = InternalMsgBody;
-external_signed#7369676e signed:SignedRequest = ExternalMsgBody;
-
-actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;
-```
-
-Contract state:
-```tl-b
-wallet_id$_ global_id:# wc:int8 version:(## 8) subwallet_number:# = WalletID;
-contract_state$_ seqno:int33 wallet_id:WalletID public_key:(## 256) extensions_dict:(HashmapE 256 int8) = ContractState;
-```
+See `types.tlb`.
 
 ## Source code
 

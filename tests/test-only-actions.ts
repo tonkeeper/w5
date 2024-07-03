@@ -7,7 +7,7 @@ import {
     SendMode,
     storeCurrencyCollection,
     storeMessageRelaxed
-} from 'ton-core';
+} from '@ton/core';
 import {
     ExtendedAction,
     OutAction
