@@ -1,8 +1,22 @@
-# 🔥W5: wallet v5 standard
+# W5: wallet smart contract v5
 
-This is an extensible wallet specification aimed at replacing V4 and allowing arbitrary extensions.
+New version of wallet smart contract, the previous one was [v4r2](https://github.com/ton-blockchain/wallet-contract).
 
-W5 has **25% lower fees**, supports **gasless transactions** (via third party relayers) and implements a **flexible extension mechanism**.
+The entire concept is proposed by the [Tonkeeper team](https://tonkeeper.com/).
+
+New Features:
+
+- Send up to 255 messages at once;
+
+- Signed actions can be sent not only by external message, but also by internal messages (can be used for gasless transactions);
+
+- Unlimited extensions;
+
+- Extension can prohibit signed actions in the wallet (can be used for 2fa or key recovery);
+
+- Optimizations to reduce network fees;
+
+- Better foolproofing safety - reply-protection for external messages, wallet id rethinking;
 
 ## Project structure
 
@@ -13,25 +27,17 @@ W5 has **25% lower fees**, supports **gasless transactions** (via third party re
 -   `scripts` - scripts used by the project, mainly the deployment scripts, additionally contains utilities for gas optimisation.
 -   `fift` - contains standard Fift v0.4.4 library including the assembler and disassembler for gas optimisation utilities.
 
-### Additional documentation
-
--   [Gas improvements](Improvements.rst) - a log of improvements, detailed by primary code paths, global gas counters per commit.
--   [Contest](Contest.md) - a note showing some information about interesting improvements during the optimisation contest.
-
 ## How to use
 
 ### Build
 
-`npm run build:v5`
+`npm run build`
 
 ### Test
 
 `npm run test`
 
 ### Deployment
-1. Deploy library: `npm run deploy-library`
-2. Deploy wallet: `npm run deploy-wallet`
 
-### Get wallet compiled code
+Deploy wallet: `npm run deploy-wallet`
 
-`npm run print-wallet-code`

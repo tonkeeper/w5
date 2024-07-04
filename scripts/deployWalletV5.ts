@@ -1,6 +1,6 @@
 import { Dictionary, toNano } from 'ton-core';
 import { WalletId, WalletV5 } from '../wrappers/wallet-v5';
-import { compile, NetworkProvider } from '@ton-community/blueprint';
+import { compile, NetworkProvider } from '@ton/blueprint';
 import { LibraryDeployer } from '../wrappers/library-deployer';
 import { getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
 
@@ -15,11 +15,11 @@ export async function run(provider: NetworkProvider) {
     const walletV5 = provider.open(
         WalletV5.createFromConfig(
             {
-                signature_auth_disabled: false,
+                signatureAllowed: true,
                 seqno: 0,
                 walletId: new WalletId({ networkGlobalId: -3 }).serialized, // testnet
                 publicKey: keypair.publicKey,
-                extensions: Dictionary.empty()
+                extensions: Dictionary.empty() as any
             },
             LibraryDeployer.exportLibCode(await compile('wallet_v5'))
         )
