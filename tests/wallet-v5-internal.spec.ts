@@ -1,9 +1,9 @@
 import {Blockchain, BlockchainTransaction, SandboxContract} from '@ton/sandbox';
 import { Address, beginCell, Cell, Dictionary, Sender, SendMode, toNano } from '@ton/core';
-import { Opcodes, WalletId, WalletV5 } from '../wrappers/wallet-v5';
+import { Opcodes, WalletV5 } from '../wrappers/wallet-v5';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
-import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from 'ton-crypto';
+import { getSecureRandomBytes, KeyPair, keyPairFromSeed, sign } from '@ton/crypto';
 import { bufferToBigInt, createMsgInternal, disableConsoleError, packAddress, validUntil } from './utils';
 import {
     ActionAddExtension,
@@ -16,18 +16,20 @@ import { TransactionComputeVm } from '@ton/core/src/types/TransactionComputePhas
 import { buildBlockchainLibraries, LibraryDeployer } from '../wrappers/library-deployer';
 import { default as config } from './config';
 import { ActionSetCode, ActionSetData } from './test-only-actions';
+import { TestWallet, WalletIdV5R1, TestWalletFromV5, storeWalletIdV5R1 } from '../wrappers/wallet-v5-test';
 
-const WALLET_ID = new WalletId({ networkGlobalId: -239, workChain: 0, subwalletNumber: 0 });
+let walletId = 0;
 
 describe('Wallet V5 sign auth internal', () => {
     let code: Cell;
 
     beforeAll(async () => {
         code = await compile('wallet_v5');
+        console.log("Code hash:", code.hash().toString('hex'));
     });
 
     let blockchain: Blockchain;
-    let walletV5: SandboxContract<WalletV5>;
+    let walletV5: SandboxContract<TestWallet>;
     let keypair: KeyPair;
     let sender: Sender;
     let seqno: number;
@@ -44,34 +46,38 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     async function deployOtherWallet(
-        params?: Partial<Parameters<typeof WalletV5.createFromConfig>[0]>
     ) {
         const _keypair = keyPairFromSeed(await getSecureRandomBytes(32));
 
         const _walletV5 = blockchain.openContract(
-            WalletV5.createFromConfig(
+            TestWalletFromV5(
+            WalletV5.create(
                 {
-                    signatureAllowed: true,
-                    seqno: params?.seqno ?? 0,
-                    walletId: params?.walletId ?? WALLET_ID.serialized,
-                    publicKey: params?.publicKey ?? _keypair.publicKey,
-                    extensions: params?.extensions ?? Dictionary.empty()
+                    walletId: {
+                        networkGlobalId: -239,
+                    },
+                    publicKey: _keypair.publicKey,
                 },
-                LibraryDeployer.exportLibCode(code)
+            )
             )
         );
 
         const deployer = await blockchain.treasury('deployer');
-        const _sender = deployer.getSender();
 
-        const deployResult = await _walletV5.sendDeploy(_sender, toNano('0.05'));
-        return { sender: _sender, walletV5: _walletV5, keypair: _keypair, deployer, deployResult };
+        //const deployResult = await _walletV5.sendDeploy(_sender, toNano('0.05'));
+        const deployResult   = await deployer.send({
+            to: _walletV5.address,
+            value: toNano('0.05'),
+            init: _walletV5.init
+        });
+        return { sender: deployer.getSender(), walletV5: _walletV5, keypair: _keypair, deployer, deployResult };
     }
+
 
     function createBody(actionsList: Cell) {
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -92,22 +98,32 @@ describe('Wallet V5 sign auth internal', () => {
         keypair = keyPairFromSeed(await getSecureRandomBytes(32));
 
         walletV5 = blockchain.openContract(
-            WalletV5.createFromConfig(
-                {
-                    signatureAllowed: true,
-                    seqno: 0,
-                    walletId: WALLET_ID.serialized,
-                    publicKey: keypair.publicKey,
-                    extensions: Dictionary.empty()
-                },
-                LibraryDeployer.exportLibCode(code)
+            TestWalletFromV5(
+                WalletV5.create(
+                    {
+                        publicKey: keypair.publicKey,
+                        walletId: {
+                            networkGlobalId: -239,
+                            context: {
+                                workchain: 0,
+                                walletVersion: 'v5r1',
+                                subwalletNumber: 42
+                            }
+                        }
+                    },
+                )
             )
         );
+
 
         const deployer = await blockchain.treasury('deployer');
         sender = deployer.getSender();
 
-        const deployResult = await walletV5.sendDeploy(sender, toNano('0.05'));
+        const deployResult = await deployer.send({
+            to: walletV5.address,
+            value: toNano('0.05'),
+            init: walletV5.init
+        });
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -115,6 +131,8 @@ describe('Wallet V5 sign auth internal', () => {
             deploy: true,
             success: true
         });
+        // Update to actual wallet id
+        walletId = await walletV5.getWalletId();
 
         seqno = 0;
     });
@@ -471,14 +489,14 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(vu, 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
             .endCell();
 
         const fakePayload = beginCell()
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(vu, 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -523,7 +541,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -577,7 +595,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno + 1, 32) // seqno
             .storeSlice(actionsList.beginParse())
@@ -622,7 +640,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(Math.round(Date.now() / 1000) - 600, 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -667,7 +685,13 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell()
             .storeUint(Opcodes.auth_signed_internal, 32)
-            .storeUint(new WalletId({ ...WALLET_ID, subwalletNumber: 1 }).serialized, 32)
+            .store(storeWalletIdV5R1({networkGlobalId: -239,
+                                     context: {
+                                         workchain: 0,
+                                         walletVersion: 'v5r1',
+                                         subwalletNumber: 1
+                                     }
+            }))
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -712,7 +736,7 @@ describe('Wallet V5 sign auth internal', () => {
 
         const payload = beginCell() // auth_signed used instead of auth_signed_internal
             .storeUint(Opcodes.auth_signed, 32)
-            .storeUint(WALLET_ID.serialized, 32)
+            .storeUint(walletId, 32)
             .storeUint(validUntil(), 32)
             .storeUint(seqno, 32)
             .storeSlice(actionsList.beginParse())
@@ -724,8 +748,7 @@ describe('Wallet V5 sign auth internal', () => {
             .storeUint(bufferToBigInt(signature), 512)
             .endCell();
 
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell().storeSlice(body.beginParse()).endCell()
         });
@@ -751,8 +774,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should skip message if auth kind not given', async () => {
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell().endCell()
         });
@@ -768,8 +790,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should not revert on short "sint" messages', async () => {
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell().storeUint(Opcodes.auth_signed_internal, 32).endCell()
         });
@@ -785,8 +806,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should not revert on long incorrect "sint" messages', async () => {
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell()
                 .storeUint(Opcodes.auth_signed_internal, 32)
@@ -805,8 +825,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should skip message with simple text comment', async () => {
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell().storeUint(0, 32).storeStringTail('Hello world').endCell()
         });
@@ -830,8 +849,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should skip message with longer text comment', async () => {
-        const receipt = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: beginCell().storeUint(0, 32).storeStringTail('Hello world'.repeat(20)).endCell()
         });
@@ -859,8 +877,7 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionAddExtension(sender.address!)
         ]);
 
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const res = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(actionsList)
         });
@@ -882,13 +899,12 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(142);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true);
     });
 
     it('Should fail allowing signature auth when allowed', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -913,13 +929,12 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(143);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true);
     });
 
     it('Should add ext and disallow signature auth', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -961,16 +976,15 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(0);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(0);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(false);
 
         const contract_seqno = await walletV5.getSeqno();
         expect(contract_seqno).toEqual(seqno);
     });
 
     it('Should add ext and disallow signature auth in separate txs', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -1011,8 +1025,8 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(0);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true);
 
         const actionsList2 = packActionsList([
             new ActionSetSignatureAuthAllowed(false)
@@ -1034,16 +1048,15 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(0);
 
-        const isSignatureAuthAllowed2 = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed2).toEqual(0);
+        const isSignatureAuthAllowed2 = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed2).toEqual(false);
 
         const contract_seqno = await walletV5.getSeqno();
         expect(contract_seqno).toEqual(seqno);
     });
 
     it('Should add ext, disallow sign, allow sign, remove ext in one tx; send in other', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -1073,8 +1086,8 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(0);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true);
 
         const contract_seqno = await walletV5.getSeqno();
         expect(contract_seqno).toEqual(seqno);
@@ -1090,8 +1103,7 @@ describe('Wallet V5 sign auth internal', () => {
             new ActionSendMsg(SendMode.PAY_GAS_SEPARATELY, msg)
         ]);
 
-        const receipt2 = await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        const receipt2 = await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(actionsList2)
         });
@@ -1111,8 +1123,7 @@ describe('Wallet V5 sign auth internal', () => {
     });
 
     it('Should fail removing last extension with signature auth disabled', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -1143,13 +1154,12 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(144);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true);
     });
 
     it('Should fail disallowing signature auth twice in tx', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -1179,13 +1189,12 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(143);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(-1); // throw when handling, packet is dropped
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(true); // throw when handling, packet is dropped
     });
 
     it('Should add ext, disallow sig auth; fail different signed tx', async () => {
-        await walletV5.sendInternal(sender, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
+        await walletV5.sendInternalSignedMessage(sender, {
             value: toNano(0.1),
             body: createBody(packActionsList([
                 new ActionAddExtension(sender.address!)
@@ -1226,8 +1235,8 @@ describe('Wallet V5 sign auth internal', () => {
             ).exitCode
         ).toEqual(0);
 
-        const isSignatureAuthAllowed = await walletV5.getIsSignatureAuthAllowed();
-        expect(isSignatureAuthAllowed).toEqual(0);
+        const isSignatureAuthAllowed = await walletV5.getIsSecretKeyAuthEnabled();
+        expect(isSignatureAuthAllowed).toEqual(false);
 
         const contract_seqno = await walletV5.getSeqno();
         expect(contract_seqno).toEqual(seqno);
