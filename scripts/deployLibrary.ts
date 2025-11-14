@@ -1,5 +1,5 @@
 import { toNano } from 'ton-core';
-import { compile, NetworkProvider } from '@ton-community/blueprint';
+import { compile, NetworkProvider } from '@ton/blueprint';
 import 'dotenv/config';
 import { LibraryDeployer } from '../wrappers/library-deployer';
 

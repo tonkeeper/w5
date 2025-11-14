@@ -70,7 +70,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     ;; only `action_send_msg` is allowed; `action_set_code`, `action_reserve_currency` or `action_change_library` are not.
     cs = cs.enforce_and_remove_action_send_msg_prefix();
 
-    throw_unless(error::invalid_c5, cs.slice_bits() == 8); ;; send_mode
+    throw_unless(error::invalid_c5, cs.slice_bits() == 8); ;; send_mode uint8
     throw_unless(error::invalid_c5, cs.slice_refs() == 2); ;; next-action-ref and MessageRelaxed ref
 
     ;; enforce that send_mode has +2 bit (ignore errors) set for external message.
@@ -100,7 +100,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     return ();
   }
 
-  ;; Loop extended actions until we reach standard actions
+  ;; Loop extended actions
   while (true) {
     int is_add_extension = cs~check_and_remove_add_extension_prefix();
     int is_remove_extension = is_add_extension ? 0 : cs~check_and_remove_remove_extension_prefix();
@@ -109,7 +109,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       (int address_wc, int address_hash) = parse_std_addr(cs~load_msg_addr());
       (int my_address_wc, _) = parse_std_addr(my_address());
 
-      throw_unless(error::extension_wrong_workchain, my_address_wc == address_wc);
+      throw_unless(error::extension_wrong_workchain, my_address_wc == address_wc); ;; the extension must be in the same workchain as the wallet.
 
       slice data_slice = get_data().begin_parse();
       slice data_slice_before_extensions = data_slice~load_bits(size::bool + size::seqno + size::wallet_id + size::public_key);
@@ -131,7 +131,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
               .store_dict(extensions)
               .end_cell());
 
-    } elseif (cs~check_and_remove_set_signature_allowed_prefix()) {
+    } elseif (cs~check_and_remove_set_signature_allowed_prefix()) { ;; allow/disallow signature
       throw_unless(error::only_extension_can_change_signature_mode, is_extension);
       int allow_signature = cs~load_int(1);
       slice data_slice = get_data().begin_parse();
@@ -184,6 +184,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
       return ();
     }
   }
+  ;; In case the wallet application has initially, by mistake, deployed a contract with the wrong bit (signature is forbidden and extensions are empty) - we allow such a contract to work.
   throw_if(error::signature_disabled, (~ is_signature_allowed) & is_extensions_not_empty);
   throw_unless(error::invalid_seqno, seqno == stored_seqno);
   throw_unless(error::invalid_wallet_id, wallet_id == stored_wallet_id);
@@ -193,7 +194,6 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     accept_message();
   }
 
-  ;; Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
   stored_seqno = stored_seqno + 1;
   set_data(begin_cell()
     .store_int(true, size::bool) ;; is_signature_allowed
@@ -202,6 +202,7 @@ cell verify_c5_actions(cell c5, int is_external) inline {
     .end_cell());
 
   if (is_external) {
+    ;; For external messages we commit seqno changes, so that even if an exception occurs further on, the reply-protection will still work.
     commit();
   }
 
@@ -217,14 +218,14 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
 () recv_internal(cell in_msg_full, slice in_msg_body) impure inline {
   if (in_msg_body.slice_bits() < size::message_operation_prefix) {
-    return ();
+    return (); ;; just receive Toncoins
   }
   int op = in_msg_body.preload_uint(size::message_operation_prefix);
   if ((op != prefix::extension_action) & (op != prefix::signed_internal)) {
-    return ();
+    return (); ;; just receive Toncoins
   }
 
-  ;; bounded messages has 0xffffff prefix and skipped by op check
+  ;; bounced messages has 0xffffffff prefix and skipped by op check
 
   if (op == prefix::extension_action) {
     in_msg_body~skip_bits(size::message_operation_prefix);
@@ -257,7 +258,9 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
   }
 
-  ;; Additional check to make sure that there are enough bits for reading before signature check
+  ;; Before signature checking we handle errors silently (return), after signature checking we throw exceptions.
+
+  ;; Check to make sure that there are enough bits for reading before signature check
   if (in_msg_body.slice_bits() < size::message_operation_prefix + size::wallet_id + size::valid_until + size::seqno + size::signature) {
     return ();
   }
@@ -290,7 +293,7 @@ int get_public_key() method_id {
     .preload_uint(size::public_key);
 }
 
-;; Returns raw dictionary (or null if empty) where keys are address hashes. Workchains of extensions are same with wallet smart contract workchain
+;; Returns raw dictionary (or null if empty) where keys are address hashes. Workchains of extensions are same with wallet smart contract workchain.
 cell get_extensions() method_id {
   return get_data().begin_parse()
     .skip_bits(size::bool + size::seqno + size::wallet_id + size::public_key)
