@@ -7,8 +7,6 @@ This is an extensible wallet specification aimed at replacing V4 and allowing ar
 * [Features](#features)
 * [Overview](#overview)
 * [Discussion](#discussion)
-* [Wallet ID](#wallet-id)
-* [Packed address](#packed-address)
 * [TL-B definitions](#tl-b-definitions)
 * [Source code](#source-code)
 
@@ -30,7 +28,7 @@ Thanks to [Skydev](https://github.com/Skydev0h) for optimization and preparing t
 * Extensions can perform the same operations as the signer: emit arbitrary messages on behalf of the owner, add and remove extensions.
 * Signed requests can be delivered via internal message to allow 3rd party pay for gas.
 * For consistency and ease of indexing, external messages also receive a 32-bit opcode.
-* To lay foundation for support of scenarios like 2FA or access recovery it is possible to disable signature authentication.
+* To lay foundation for support of scenarios like 2FA or access recovery it is possible to disable signature authentication by extension.
 
 ## Overview
 
