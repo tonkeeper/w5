@@ -1,5 +1,14 @@
 name: Run tests
-
+            - name: Parasoft Coverage Action
+  # You may pin to the exact commit or the version.
+  # uses: parasoft/parasoft-coverage-action@dc8bd4b25cfcdfa048caedfd4679c109f0cac133
+  uses: parasoft/parasoft-coverage-action@1.0.0
+  with:
+    # Path or minimatch pattern to locate Parasoft coverage report XML files. If using a relative path, it is relative to the GitHub workspace directory. e.g. **/coverage.xml
+    report: 
+    # Root path to the Parasoft tool or Java installation required to locate the Java environment for report processing. If not specified, the GitHub Action will attempt to use the path from the JAVA_HOME environment variable.
+    parasoftToolOrJavaRootPath: # optional
+          
 on:
   push:
     branches: [ "main", "feature/optimisation" ]
