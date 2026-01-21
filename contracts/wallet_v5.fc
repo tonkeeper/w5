@@ -1,4 +1,4 @@
-#pragma version =0.4.4;
+allow signature/all permissions allowed#pragma version =0.4.4;
 
 #include "imports/stdlib.fc";
 
