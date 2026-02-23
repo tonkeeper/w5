@@ -35,3 +35,4 @@ W5 has **25% lower fees**, supports **gasless transactions** (via third party re
 ### Get wallet compiled code
 
 `npm run print-wallet-code`
+tab
