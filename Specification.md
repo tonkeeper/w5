@@ -1,4 +1,4 @@
-# Extensible Wallet V5
+tab# Extensible Wallet V5
 
 Author: Oleg Andreev <oleg@tonkeeper.com>
 
@@ -7,8 +7,6 @@ This is an extensible wallet specification aimed at replacing V4 and allowing ar
 * [Features](#features)
 * [Overview](#overview)
 * [Discussion](#discussion)
-* [Wallet ID](#wallet-id)
-* [Packed address](#packed-address)
 * [TL-B definitions](#tl-b-definitions)
 * [Source code](#source-code)
 
@@ -30,7 +28,7 @@ Thanks to [Skydev](https://github.com/Skydev0h) for optimization and preparing t
 * Extensions can perform the same operations as the signer: emit arbitrary messages on behalf of the owner, add and remove extensions.
 * Signed requests can be delivered via internal message to allow 3rd party pay for gas.
 * For consistency and ease of indexing, external messages also receive a 32-bit opcode.
-* To lay foundation for support of scenarios like 2FA or access recovery it is possible to disable signature authentication.
+* To lay foundation for support of scenarios like 2FA or access recovery it is possible to disable signature authentication by extension.
 
 ## Overview
 
@@ -62,7 +60,7 @@ User may delegate this job to other apps via extensions.
 * routing of incoming payments and messages: use a specialized contract instead.
 * imposing limits on access to certain assets: put account restriction inside a jetton, or use a lockup contract instead.
 
-### Extending the wallet
+esc### Extending the wallet
 
 The best way to extend functionality of the wallet is to use the extensions mechanism that permit delegating access to the wallet to other contracts.
 
@@ -96,7 +94,7 @@ You need to put two requests in your message body:
 
 Yes. We have considered constant-size schemes where the wallet only stores trusted extension code. However, extension authentication becomes combursome and expensive: plugin needs to transmit additional data and each request needs to recompute plugin’s address. We estimate that for the reasonably sized wallets (less than 100 plugins) authentication via the dictionary lookup would not exceed costs of indirect address authentication.
 
-### Why it can be useful to disallow authentication with signature?
+tab### Why it can be useful to disallow authentication with signature?
 
 Ability to disallow authentication with signature enables two related use-cases:
 
