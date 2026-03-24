@@ -78,8 +78,10 @@ cell verify_c5_actions(cell c5, int is_external) inline {
 
     ;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
     ;; https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
-    ;; load 7 bits and make sure that they end with 1
-    throw_if(error::external_send_message_must_have_ignore_errors_send_mode, is_external & (count_trailing_zeroes(cs.preload_bits(7)) > 0));
+    ;; load 8 bits and check if bit 2 (IGNORE_ERRORS) is set for external messages
+    int mode = cs.preload_uint(8);
+    ;; IGNORE_ERRORS flag is bit 2 (value 4)
+    throw_if(error::external_send_message_must_have_ignore_errors_send_mode, is_external & ((mode & 4) == 0));
 
     (cs, _) = cs.preload_ref().begin_parse_raw();
     count += 1;
