@@ -1,4 +1,15 @@
-## Contest note!
+signed_request$_ 
+  signature:    bits512                   // 512
+  subwallet_id: uint32                    // 512+32
+  valid_until:  uint32                    // 512+32+32
+  msg_seqno:    uint32                    // 512+32+32+32 = 608
+  inner: InnerRequest = SignedRequest;
+
+internal_signed#7369676E signed:SignedRequest = InternalMsgBody;
+internal_extension#6578746E inner:InnerRequest = InternalMsgBody;
+external_signed#7369676E signed:SignedRequest = ExternalMsgBody;
+
+actions$_ {m:#} {n:#} actions:(ActionList n m) = InnerRequest;## Contest note!
 
 <div align="center">
 <img alt="Contest logo" src="contest.png" height="280" width="280">
