@@ -22,15 +22,17 @@ import {
     EmulationError,
     SandboxContract,
     SendMessageResult,
-    internal,
     TreasuryContract
 } from '@ton/sandbox';
 import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from '@ton/crypto';
-import { Opcodes, walletV5ConfigToCell } from '../wrappers/wallet-v5';
+import { Opcodes } from '../wrappers/wallet-v5';
 import { bufferToBigInt, getRandomInt, pickRandomNFrom } from './utils';
 import { findTransactionRequired, randomAddress } from '@ton/test-utils';
 import { estimateMessageImpact, getMsgPrices, MsgPrices, storageGeneric } from './gasUtils';
 import { ErrorsV5 } from '../wrappers/Errors';
+import {
+    WalletV5
+} from '../wrappers/wallet-v5';
 import {
     WalletV5Test,
     MessageOut,
@@ -38,15 +40,17 @@ import {
     ExtendedAction,
     message2action,
     ExtensionAdd,
-    ExtensionRemove
+    ExtensionRemove,
+    TestWalletFromV5,
+    TestWallet,
 } from '../wrappers/wallet-v5-test';
 
 describe('Wallet v5 external tests', () => {
     let blockchain: Blockchain;
     let keys: KeyPair;
-    let wallet: SandboxContract<WalletV5Test>;
-    let newWallet: SandboxContract<WalletV5Test>;
-    let walletId: bigint;
+    let wallet: SandboxContract<TestWallet>;
+    let newWallet: SandboxContract<TestWallet>;
+    let walletId: number;
     const validOpCodes = [
         Opcodes.auth_signed,
         Opcodes.auth_signed_internal,
@@ -84,7 +88,7 @@ describe('Wallet v5 external tests', () => {
     let shouldRejectWith: (p: Promise<unknown>, code: number) => Promise<void>;
     let assertSendMessages: (
         exp: number,
-        wallet_id: bigint,
+        wallet_id: number,
         valid_until: number,
         seqno: bigint | number,
         messages: MessageOut[],
@@ -94,7 +98,7 @@ describe('Wallet v5 external tests', () => {
 
     //type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
     type TestArgs = {
-        walletId: bigint;
+        walletId: number;
         valid_until: number;
         seqno: bigint | number;
         actions: WalletActions;
@@ -152,8 +156,25 @@ describe('Wallet v5 external tests', () => {
         msgPrices = getMsgPrices(blockchain.config, 0);
         msgPricesMc = getMsgPrices(blockchain.config, -1);
 
-        walletId = BigInt(getRandomInt(10, 1337));
+        const subwalletId = getRandomInt(10, 1337);
         wallet = blockchain.openContract(
+            TestWalletFromV5(
+                WalletV5.create({
+                    walletId: {
+                        networkGlobalId: -239,
+                        context: {
+                            walletVersion: 'v5r1',
+
+                            workchain: 0,
+                            subwalletNumber: subwalletId,
+                        }
+                    },
+                    publicKey: keys.publicKey
+                })
+            )
+        );
+
+            /*
             WalletV5Test.createFromConfig(
                 {
                     seqno: 0,
@@ -164,9 +185,14 @@ describe('Wallet v5 external tests', () => {
                 },
                 code
             )
-        );
+            */
 
-        const deploy = await wallet.sendDeploy(owner.getSender(), toNano('100000'));
+        //const deploy = await wallet.send(owner.getSender(), toNano('100000'));
+        const deploy = await owner.send({
+            to: wallet.address,
+            value: toNano('10000'),
+            init: wallet.init
+        });
 
         expect(deploy.transactions).toHaveTransaction({
             on: wallet.address,
@@ -174,6 +200,7 @@ describe('Wallet v5 external tests', () => {
             aborted: false,
             deploy: true
         });
+        walletId = await wallet.getWalletId();
 
         initialState = blockchain.snapshot();
 
@@ -410,13 +437,16 @@ describe('Wallet v5 external tests', () => {
             };
         };
         testSendInit = async (shouldWork, validateNewWallet) => {
-            let newWalletId: bigint;
+            let newWalletId: number;
+            let newSubwalletId: number;
             let seqNo = await wallet.getSeqno();
+            const oldSubwallet = (await wallet.getWalletIdParsed()).context.subwalletNumber;
 
             do {
-                newWalletId = BigInt(getRandomInt(1000, 100000));
-            } while (newWalletId == walletId);
+                newSubwalletId = getRandomInt(1000, (2 ** 15) - 1);
+            } while (newSubwalletId == oldSubwallet);
 
+            /*
             const newWalletData = walletV5ConfigToCell({
                 walletId: newWalletId,
                 seqno: 0,
@@ -424,9 +454,22 @@ describe('Wallet v5 external tests', () => {
                 publicKey: keys.publicKey, // Same key
                 extensions: Dictionary.empty()
             });
+            */
+            const newTestWallet = WalletV5.create({
+                publicKey: keys.publicKey,
+                walletId: {
+                    networkGlobalId: -239,
+                    context: {
+                        subwalletNumber: newSubwalletId,
+                        workchain: -1,
+                        walletVersion: 'v5r1'
+                    }
+                }
+            });
+
 
             // Deploying it to masterchain
-            const newAddress = contractAddress(-1, { code, data: newWalletData });
+            const newAddress = contractAddress(-1, { code, data: newTestWallet.init.data });
 
             const testArgs: TestArgs = {
                 walletId,
@@ -441,7 +484,7 @@ describe('Wallet v5 external tests', () => {
                                 value: toNano('100'),
                                 init: {
                                     code,
-                                    data: newWalletData
+                                    data: newTestWallet.init.data
                                 }
                             }),
                             mode: defaultExternalMode
@@ -454,7 +497,8 @@ describe('Wallet v5 external tests', () => {
 
             await shouldWork(testArgs);
 
-            newWallet = blockchain.openContract(WalletV5Test.createFromAddress(newAddress));
+            newWallet = blockchain.openContract(TestWalletFromV5(newTestWallet));
+            newWalletId = await newWallet.getWalletId();
 
             // New wallet should be able to send message with current key
 
@@ -468,9 +512,8 @@ describe('Wallet v5 external tests', () => {
             // res = await newWallet.sendMessagesExternal(newWalletId, curTime() + 100, 0, keys.secretKey, [mockMessage]);
 
             // Let's test getters while we can
-            expect((await newWallet.getWalletId()).subwalletNumber).toEqual(Number(newWalletId));
             expect(await newWallet.getPublicKey()).toEqual(bufferToBigInt(keys.publicKey));
-            expect(await newWallet.getIsSignatureAuthAllowed()).toBe(-1);
+            expect(await newWallet.getIsSecretKeyAuthEnabled()).toBe(true);
 
             hasMcWallet = blockchain.snapshot();
         };
@@ -619,7 +662,7 @@ describe('Wallet v5 external tests', () => {
             // But it should work for the wallet in basechain
 
             const newSeqNo = await newWallet.getSeqno();
-            const newId = BigInt((await newWallet.getWalletId()).subwalletNumber);
+            const newId = await newWallet.getWalletId();
 
             testArgs = {
                 walletId: newId,
@@ -879,7 +922,7 @@ describe('Wallet v5 external tests', () => {
                         keys.secretKey
                     );
                     await shouldRejectWith(
-                        wallet.sendExternalSignedMessage(newMsg),
+                        wallet.send(newMsg),
                         ErrorsV5.invalid_message_operation
                     );
                     // Should not change seqno
@@ -887,7 +930,7 @@ describe('Wallet v5 external tests', () => {
                 }
 
                 // Validate that original message works
-                const res = await wallet.sendExternalSignedMessage(
+                const res = await wallet.send(
                     WalletV5Test.signRequestMessage(validMsg, keys.secretKey)
                 );
                 expect(res.transactions).toHaveTransaction({
@@ -955,7 +998,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await wallet.sendExternalSignedMessage(reqMsg);
+                        const res = await wallet.send(reqMsg);
                         expect(res.transactions).toHaveTransaction({
                             on: args.extra.new_address,
                             aborted: false,
@@ -1036,11 +1079,11 @@ describe('Wallet v5 external tests', () => {
             });
             it('should reject message with invalid subwallet', async () => {
                 const seqNo = await wallet.getSeqno();
-                const testDelta = BigInt(getRandomInt(2, Number(walletId)));
+                const testDelta = getRandomInt(2, Number(walletId));
 
                 for (let testId of [
-                    walletId - 1n,
-                    walletId + 1n,
+                    walletId - 1,
+                    walletId + 1,
                     walletId - testDelta,
                     walletId + testDelta
                 ]) {
@@ -1098,7 +1141,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await wallet.sendExternalSignedMessage(setCodeRequest);
+                        const res = await wallet.send(setCodeRequest);
                         expect(res.transactions).toHaveTransaction({
                             on: wallet.address,
                             op: Opcodes.auth_signed,
@@ -1120,7 +1163,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await wallet.sendExternalSignedMessage(sendJustMessages);
+                        const res = await wallet.send(sendJustMessages);
                         expect(res.transactions).toHaveTransaction({
                             on: wallet.address,
                             op: Opcodes.auth_signed,
@@ -1142,7 +1185,7 @@ describe('Wallet v5 external tests', () => {
                         args.actions,
                         args.key
                     );
-                    const res = await wallet.sendExternalSignedMessage(reqMsg);
+                    const res = await wallet.send(reqMsg);
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
                         op: Opcodes.auth_signed,
@@ -1164,7 +1207,7 @@ describe('Wallet v5 external tests', () => {
                         args.actions,
                         args.key
                     );
-                    const res = await wallet.sendExternalSignedMessage(reqMsg);
+                    const res = await wallet.send(reqMsg);
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
                         op: Opcodes.auth_signed,
@@ -1185,7 +1228,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await wallet.sendExternalSignedMessage(reqMsg);
+                        const res = await wallet.send(reqMsg);
                         expect(res.transactions).toHaveTransaction({
                             on: wallet.address,
                             op: Opcodes.auth_signed,
@@ -1203,7 +1246,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await newWallet.sendExternalSignedMessage(reqMsg);
+                        const res = await newWallet.send(reqMsg);
                         expect(res.transactions).toHaveTransaction({
                             on: newWallet.address,
                             op: Opcodes.auth_signed,
@@ -1224,7 +1267,7 @@ describe('Wallet v5 external tests', () => {
                         args.actions,
                         args.key
                     );
-                    const res = await wallet.sendExternalSignedMessage(reqMsg);
+                    const res = await wallet.send(reqMsg);
 
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
@@ -1244,7 +1287,7 @@ describe('Wallet v5 external tests', () => {
                         args.actions,
                         args.key
                     );
-                    const res = await wallet.sendExternalSignedMessage(reqMsg);
+                    const res = await wallet.send(reqMsg);
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
                         op: Opcodes.auth_signed,
@@ -1255,7 +1298,7 @@ describe('Wallet v5 external tests', () => {
                 });
             });
             // Doesn't make much sense, since inderectly tested in too many places
-            it.skip('empty action list should increase seqno', async () => {
+            it('empty action list should increase seqno', async () => {
                 const seqNo = await wallet.getSeqno();
                 const testMsg = WalletV5Test.requestMessage(
                     false,
@@ -1265,7 +1308,7 @@ describe('Wallet v5 external tests', () => {
                     {},
                     keys.secretKey
                 );
-                const res = await wallet.sendExternalSignedMessage(testMsg);
+                const res = await wallet.send(testMsg);
 
                 expect(await wallet.getSeqno()).toEqual(seqNo + 1);
             });
@@ -1279,7 +1322,7 @@ describe('Wallet v5 external tests', () => {
                         args.actions,
                         args.key
                     );
-                    const res = await wallet.sendExternalSignedMessage(reqMsg);
+                    const res = await wallet.send(reqMsg);
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
                         aborted: false,
@@ -1295,7 +1338,7 @@ describe('Wallet v5 external tests', () => {
                 const randomBody = beginCell().storeUint(curTime(), 64).endCell();
                 const seqNo = BigInt(await wallet.getSeqno());
 
-                const res = await assertSendMessages(
+                await assertSendMessages(
                     0,
                     walletId,
                     curTime() + 1000,
@@ -1364,12 +1407,12 @@ describe('Wallet v5 external tests', () => {
 
             it('should bounce message with invalid subwallet', async () => {
                 const seqNo = await wallet.getSeqno();
-                const testDelta = BigInt(getRandomInt(2, Number(walletId)));
+                const testDelta = getRandomInt(2, Number(walletId));
                 const stateBefore = await getWalletData();
 
                 for (let testId of [
-                    walletId - 1n,
-                    walletId + 1n,
+                    walletId - 1,
+                    walletId + 1,
                     walletId - testDelta,
                     walletId + testDelta
                 ]) {
@@ -1452,7 +1495,7 @@ describe('Wallet v5 external tests', () => {
                             args.actions,
                             args.key
                         );
-                        const res = await wallet.sendExternalSignedMessage(sendJustMessages);
+                        const res = await wallet.send(sendJustMessages);
                         expect(res.transactions).toHaveTransaction({
                             on: wallet.address,
                             op: Opcodes.auth_signed,
@@ -1523,36 +1566,52 @@ describe('Wallet v5 external tests', () => {
                 assertInternal(res.transactions, owner.address, 0);
                 expect(await wallet.getSeqno()).toEqual(seqNo + 1);
             });
-            it('should ignore internal message with correct prefix, but incorrect length', async () => {
+            it('should ignore message if length less than required for signature check', async () => {
                 const seqNo = await wallet.getSeqno();
-                // So we have message with bad wallet id
+                // So we have unsigned message
                 const badMsg = WalletV5Test.requestMessage(
                     true,
-                    walletId - 1n,
+                    walletId,
                     curTime() + 1000,
                     BigInt(seqNo),
-                    {},
-                    keys.secretKey
+                    {}
                 );
 
-                // Now we have it's truncated version
-                const msgTrunc = beginCell()
-                    .storeBits(badMsg.beginParse().loadBits(badMsg.bits.length - 10))
-                    .endCell(); // off by one
+                const ds = badMsg.beginParse();
+                // action bits preceeding signature
+                // It's malformed, yet it is possible to check signature
+                const offByTwo = beginCell()
+                    .storeBits(ds.preloadBits(badMsg.bits.length - 2))
+                    .endCell();
+                // This however means that error is in the main body wallet_id, seqno, valid_untill
+                // So this should be ignored
+                // However, in a perfect world prefix + signature length should be the only requirement
+                const offByThree = beginCell()
+                    .storeBits(ds.preloadBits(badMsg.bits.length - 3))
+                    .endCell();
 
                 let res = await wallet.sendInternalSignedMessage(owner.getSender(), {
                     value: toNano('1'),
-                    body: msgTrunc
+                    body: WalletV5Test.signRequestMessage(offByTwo, keys.secretKey)
                 });
-                // Now, because it's truncated it gets ignored
-                assertInternal(res.transactions, owner.address, 0);
-
+                // Should fail and bounce
+                expect(res.transactions).toHaveTransaction({
+                    on: wallet.address,
+                    op: Opcodes.auth_signed_internal,
+                    aborted: true,
+                    outMessagesCount: 1
+                });
                 res = await wallet.sendInternalSignedMessage(owner.getSender(), {
                     value: toNano('1'),
-                    body: badMsg
+                    body: WalletV5Test.signRequestMessage(offByThree, keys.secretKey)
                 });
-                assertInternal(res.transactions, owner.address, ErrorsV5.invalid_wallet_id);
-                // If we send it as is, the subwallet exception will trigger
+                // Goes into sand now
+                expect(res.transactions).toHaveTransaction({
+                    on: wallet.address,
+                    op: Opcodes.auth_signed_internal,
+                    aborted: false,
+                    outMessagesCount: 0
+                });
             });
             it('should be able to send up to 255 messages', async () => {
                 let testMsgs: MessageOut[] = new Array(255);
@@ -2152,14 +2211,6 @@ describe('Wallet v5 external tests', () => {
                         if (!Address.isAddress(args.extra.new_address)) {
                             throw new TypeError('Callback requires wallet address');
                         }
-                        const reqMsg = WalletV5Test.requestMessage(
-                            true,
-                            args.walletId,
-                            args.valid_until,
-                            args.seqno,
-                            args.actions,
-                            args.key
-                        );
                         const res = await wallet.sendExtensionActions(
                             testExtensionBc.getSender(),
                             args.actions
@@ -2442,7 +2493,7 @@ describe('Wallet v5 external tests', () => {
                     keys.secretKey
                 );
 
-                let res = await wallet.sendExternalSignedMessage(extReq);
+                let res = await wallet.send(extReq);
                 expect(res.transactions).toHaveTransaction({
                     on: wallet.address,
                     op: Opcodes.auth_signed,
@@ -2551,7 +2602,7 @@ describe('Wallet v5 external tests', () => {
                         { wallet: actionList },
                         keys.secretKey
                     );
-                    res = await wallet.sendExternalSignedMessage(extReq);
+                    res = await wallet.send(extReq);
                     expect(res.transactions).toHaveTransaction({
                         on: wallet.address,
                         op: Opcodes.auth_signed,
@@ -2592,7 +2643,6 @@ describe('Wallet v5 external tests', () => {
         });
     });
     describe('Signature auth', () => {
-        type OwnerArguments = { walletId: bigint; seqno: number | bigint; key: Buffer };
         let signatureDisabled: BlockchainSnapshot;
         let signatureEnabled: BlockchainSnapshot;
         let multipleExtensions: BlockchainSnapshot;
@@ -2608,8 +2658,8 @@ describe('Wallet v5 external tests', () => {
 
         it('extension should be able to set signature mode', async () => {
             const seqNo = await wallet.getSeqno();
-            const allowedBefore = await wallet.getIsSignatureAuthAllowed();
-            expect(allowedBefore).toBe(-1);
+            const allowedBefore = await wallet.getIsSecretKeyAuthEnabled();
+            expect(allowedBefore).toBe(true);
             signatureEnabled = blockchain.snapshot();
 
             let res = await wallet.sendExtensionActions(testExtensionBc.getSender(), {
@@ -2627,7 +2677,7 @@ describe('Wallet v5 external tests', () => {
                 op: Opcodes.auth_extension,
                 aborted: false
             });
-            expect(await wallet.getIsSignatureAuthAllowed()).toBe(0);
+            expect(await wallet.getIsSecretKeyAuthEnabled()).toBe(false);
             expect(await wallet.getSeqno()).toEqual(seqNo);
             signatureDisabled = blockchain.snapshot();
 
@@ -2645,7 +2695,7 @@ describe('Wallet v5 external tests', () => {
                 op: Opcodes.auth_extension,
                 aborted: false
             });
-            expect(await wallet.getIsSignatureAuthAllowed()).toBe(-1);
+            expect(await wallet.getIsSecretKeyAuthEnabled()).toBe(true);
             expect(await wallet.getSeqno()).toEqual(seqNo);
             signatureEnabled = blockchain.snapshot(); // Usefull?
         });
@@ -2713,7 +2763,7 @@ describe('Wallet v5 external tests', () => {
                             });
                             expect(await getWalletData()).toEqualCell(stateBefore);
                         } else {
-                            const res = await wallet.sendExternalSignedMessage(msgExt);
+                            const res = await wallet.send(msgExt);
                             expect(res.transactions).toHaveTransaction({
                                 on: wallet.address,
                                 aborted: false,
@@ -2775,7 +2825,6 @@ describe('Wallet v5 external tests', () => {
         it('extension should be able to add another extension when sig auth is disabled', async () => {
             await loadFrom(signatureDisabled);
             const testExtAddr = randomAddress();
-            const stateBefore = await getWalletData();
             const extBefore = await wallet.getExtensionsArray();
             expect(extBefore.length).toBe(1);
 
@@ -2865,6 +2914,99 @@ describe('Wallet v5 external tests', () => {
             });
 
             expect(await getWalletData()).toEqualCell(stateBefore);
+        });
+        it('should be able to withdraw funds on deploy with sig auth disabled', async () => {
+            let newWalletId: number;
+            let newSubwalletId: number;
+
+            const oldSubwallet = (await wallet.getWalletIdParsed()).context.subwalletNumber;
+
+            do {
+                newSubwalletId = getRandomInt(0, 10000);
+            } while (newSubwalletId == oldSubwallet);
+
+            let seqNo = 0;
+            const badWallet = blockchain.openContract(
+                WalletV5Test.createFromConfig(
+                    {
+                        walletId: {
+                            networkGlobalId: -239,
+                            context: {
+                                walletVersion: 'v5r1',
+                                workchain: 0,
+                                subwalletNumber: newSubwalletId
+                            }
+                        },
+                        seqno: seqNo,
+                        publicKey: keys.publicKey,
+                        signatureAllowed: false, // That's what we're testing. That's pretty much an incorrect deployment
+                        extensions: Dictionary.empty() // If one supplies non empty dictionary here, you're cooked.
+                    },
+                    code
+                )
+            );
+
+            let res = await badWallet.sendDeploy(owner.getSender(), toNano('100'));
+            expect(res.transactions).toHaveTransaction({
+                on: badWallet.address,
+                aborted: false,
+                deploy: true
+            });
+
+            newWalletId = await badWallet.getWalletId();
+            // Normally that would lock funds, because owner can only auth himself via signatur
+
+            const sendOut: MessageOut[] = [
+                {
+                    message: internal_relaxed({
+                        to: owner.address,
+                        value: toNano('10')
+                    }),
+                    mode: SendMode.PAY_GAS_SEPARATELY | SendMode.IGNORE_ERRORS
+                }
+            ];
+
+            res = await badWallet.sendMessagesInternal(
+                owner.getSender(),
+                newWalletId,
+                curTime() + 100,
+                seqNo,
+                keys.secretKey,
+                sendOut
+            );
+            expect(res.transactions).toHaveTransaction({
+                on: badWallet.address,
+                op: Opcodes.auth_signed_internal,
+                aborted: false,
+                outMessagesCount: 1
+            });
+            expect(res.transactions).toHaveTransaction({
+                on: owner.address,
+                from: badWallet.address,
+                value: toNano('10')
+            });
+            expect(await badWallet.getSeqno()).toEqual(++seqNo);
+
+            res = await badWallet.sendMessagesExternal(
+                newWalletId,
+                curTime() + 100,
+                seqNo,
+                keys.secretKey,
+                sendOut
+            );
+
+            expect(res.transactions).toHaveTransaction({
+                on: badWallet.address,
+                op: Opcodes.auth_signed,
+                aborted: false,
+                outMessagesCount: 1
+            });
+            expect(res.transactions).toHaveTransaction({
+                on: owner.address,
+                from: badWallet.address,
+                value: toNano('10')
+            });
+            expect(await badWallet.getSeqno()).toEqual(++seqNo);
         });
     });
 });
