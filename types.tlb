@@ -7,6 +7,12 @@ contract_state$_
   extensions_dict:      (HashmapE 256 int1)
 = ContractState;
 
+
+// Extended for W5:
+// note: `m = extended actions count - 1`, so the last ref is not empty cell
+extended_list_last$_ action:W5ExtendedAction = W5ExtendedActionList 0;
+extended_list_action$_ {m:#} action:W5ExtendedAction prev:^(W5ExtendedActionList m) = W5ExtendedActionList (m + 1);
+
 // Extended actions in W5:
 add_extension#02 addr:MsgAddressInt = W5ExtendedAction;
 delete_extension#03 addr:MsgAddressInt = W5ExtendedAction;
@@ -27,9 +33,11 @@ w5_signed_request$_ {m:#} {n:#}
   signature:    bits512
 = W5SignedRequest m n;
 
-// actions_count = m, extended_actions_count - 1 = n
+// actions_count = m, extended_actions_count-1 = n
 w5_internal_signed_request#73696e74 {m:#} {n:#} request:(W5SignedRequest m n) = W5MsgBody m n;
 w5_external_signed_request#7369676e {m:#} {n:#} request:(W5SignedRequest m n) = W5MsgBody m n;
+
+w5_extension_action_request#6578746e {m:#} {n:#} query_id:uint64 request:(W5InnerRequest m n) = W5MsgBody m n;
 
 w5_extension_action_request#6578746e {m:#} {n:#} query_id:uint64 request:(W5InnerRequest m n) = W5MsgBody m n;
 
